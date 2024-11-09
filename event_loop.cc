@@ -31,5 +31,9 @@ void EventLoop::assertInLoopThread() {
     abortNotInLoopThread();
   }
 }
+void EventLoop::UpdateChannel(Channel *channel) {
 
+}
 
+void EventLoop::RemoveChannel(Channel* channel) {
+}

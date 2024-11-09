@@ -3,7 +3,7 @@
 //
 
 #include "inet_address.h"
-#include <string>
+#include <cstring>
 
 INetAddress::INetAddress(uint16_t port, const std::string &ip) {
   // ipv4

@@ -1,66 +1,178 @@
-# Generated from CLion C/C++ Code Style settings
+# 基于 LLVM 风格的代码格式化设置
 BasedOnStyle: LLVM
+
+# 访问修饰符偏移量
 AccessModifierOffset: -2
+
+# 在开放括号后对齐
 AlignAfterOpenBracket: Align
+
+# 对齐连续赋值
 AlignConsecutiveAssignments: None
+
+# 对齐操作数
 AlignOperands: Align
+
+# 允许所有参数在下一行
 AllowAllArgumentsOnNextLine: false
+
+# 允许所有构造函数初始化器在下一行
 AllowAllConstructorInitializersOnNextLine: false
+
+# 允许所有参数声明在下一行
 AllowAllParametersOfDeclarationOnNextLine: false
+
+# 允许简短的代码块在单行
 AllowShortBlocksOnASingleLine: Always
+
+# 允许简短的case标签在单行
 AllowShortCaseLabelsOnASingleLine: false
+
+# 允许简短的函数在单行
 AllowShortFunctionsOnASingleLine: All
+
+# 允许简短的if语句在单行
 AllowShortIfStatementsOnASingleLine: Always
+
+# 允许简短的lambda表达式在单行
 AllowShortLambdasOnASingleLine: All
+
+# 允许简短的循环在单行
 AllowShortLoopsOnASingleLine: true
+
+# 返回类型后总是断行
 AlwaysBreakAfterReturnType: None
+
+# 模板声明总是断行
 AlwaysBreakTemplateDeclarations: Yes
+
+# 大括号前的断行
 BreakBeforeBraces: Custom
+
 BraceWrapping:
+  # case标签后不换行
   AfterCaseLabel: false
+  # 类定义后不换行
   AfterClass: false
+  # 控制语句后不换行
   AfterControlStatement: Never
+  # 枚举定义后不换行
   AfterEnum: false
+  # 函数定义后不换行
   AfterFunction: false
+  # 命名空间后不换行
   AfterNamespace: false
+  # 联合定义后不换行
   AfterUnion: false
+  # catch前不换行
   BeforeCatch: false
+  # else前不换行
   BeforeElse: false
+  # 大括号缩进
   IndentBraces: false
+  # 空函数不分拆
   SplitEmptyFunction: false
+  # 空记录分拆
   SplitEmptyRecord: true
+
+# 二元运算符前不换行
 BreakBeforeBinaryOperators: None
+
+# 三元运算符前换行
 BreakBeforeTernaryOperators: true
+
+# 构造函数初始化器在冒号前换行
 BreakConstructorInitializers: BeforeColon
+
+# 继承列表在冒号前换行
 BreakInheritanceList: BeforeColon
+
+# 列限制（0表示无限制）
 ColumnLimit: 0
+
+# 紧凑命名空间
 CompactNamespaces: false
+
+# 续行缩进宽度
 ContinuationIndentWidth: 4
+
+# case标签缩进
 IndentCaseLabels: true
+
+# 预处理指令不缩进
 IndentPPDirectives: None
+
+# 缩进宽度
 IndentWidth: 2
+
+# 保持代码块开始处的空行
 KeepEmptyLinesAtTheStartOfBlocks: true
+
+# 最大空行数
 MaxEmptyLinesToKeep: 2
+
+# 命名空间缩进
 NamespaceIndentation: All
+
+# Objective-C属性后不留空格
 ObjCSpaceAfterProperty: false
+
+# Objective-C协议列表前留空格
 ObjCSpaceBeforeProtocolList: true
-PointerAlignment: Right
+
+# 指针对齐方式
+PointerAlignment: Left
+
+# 注释不重新流式布局
 ReflowComments: false
+
+# C风格转换后留空格
 SpaceAfterCStyleCast: true
+
+# 逻辑非运算符后不留空格
 SpaceAfterLogicalNot: false
+
+# 模板关键字后不留空格
 SpaceAfterTemplateKeyword: false
+
+# 赋值运算符前留空格
 SpaceBeforeAssignmentOperators: true
+
+# C++11括号列表前不留空格
 SpaceBeforeCpp11BracedList: false
+
+# 构造函数初始化器冒号前留空格
 SpaceBeforeCtorInitializerColon: true
+
+# 继承冒号前留空格
 SpaceBeforeInheritanceColon: true
+
+# 控制语句括号前留空格
 SpaceBeforeParens: ControlStatements
+
+# 基于范围的for循环冒号前不留空格
 SpaceBeforeRangeBasedForLoopColon: false
+
+# 空括号内不留空格
 SpaceInEmptyParentheses: false
-SpacesBeforeTrailingComments: 0
+
+# 尖括号内不留空格
 SpacesInAngles: false
+
+# C风格转换括号内不留空格
 SpacesInCStyleCastParentheses: false
+
+# 容器字面量内不留空格
 SpacesInContainerLiterals: false
+
+# 括号内不留空格
 SpacesInParentheses: false
+
+# 方括号内不留空格
 SpacesInSquareBrackets: false
+
+# 制表符宽度
 TabWidth: 2
+
+# 不使用制表符
 UseTab: Never

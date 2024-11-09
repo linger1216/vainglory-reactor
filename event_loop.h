@@ -7,12 +7,16 @@
 
 #include "no_copyable.h"
 #include <thread>
-
+class Channel;
 class EventLoop : public NoCopyable {
 public:
   EventLoop();
   ~EventLoop();
   void loop();
+  void RemoveChannel(Channel* channel);
+
+public:
+  void UpdateChannel(Channel* channel);
   void assertInLoopThread();
   bool isInLoopThread() const;
 private:
