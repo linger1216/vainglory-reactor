@@ -7,13 +7,13 @@
 #include "fd_event.h"
 #include "log.h"
 
-Channel::Channel(EventLoop* loop, int fd,
-                 Channel::EventCallback readCallback,
-                 Channel::EventCallback writeCallback,
-                 Channel::EventCallback closeCallback,
-                 Channel::EventCallback errorCallback)
-    : loop_(loop), fd_(fd), events_(0), revents_(0), index_(-1),
+Channel::Channel(int fd, FDEvent events,
+                 Channel::EventCallback readCallback, Channel::EventCallback writeCallback,
+                 Channel::EventCallback closeCallback, Channel::EventCallback errorCallback,
+                 void* arg)
+    : fd_(fd), events_(static_cast<int>(events)),
       tied_(false),
+      arg_(nullptr),
       readCallback_(std::move(readCallback)),
       writeCallback_(std::move(writeCallback)),
       closeCallback_(std::move(closeCallback)),
@@ -23,37 +23,30 @@ Channel::Channel(EventLoop* loop, int fd,
 Channel::~Channel() {
   Debug("~Channel need ensure no event to handle.");
 }
-int Channel::fd() const {
+int Channel::Fd() const {
   return fd_;
 }
-int Channel::events() const {
+int Channel::Events() const {
   return events_;
 }
-void Channel::SetREvents(int revents) {
-  revents_ = revents;
-}
+
 void Channel::EnableReading() {
   events_ |= static_cast<int>(FDEvent::ReadEvent);
-  update();
 }
 void Channel::DisableReading() {
   events_ &= ~static_cast<int>(FDEvent::ReadEvent);
-  update();
 }
 
 void Channel::EnableWriting() {
   events_ |= static_cast<int>(FDEvent::WriteEvent);
-  update();
 }
 
 void Channel::DisableWriting() {
   events_ &= ~static_cast<int>(FDEvent::WriteEvent);
-  update();
 }
 
 void Channel::DisableAll() {
   events_ = static_cast<int>(FDEvent::None);
-  update();
 }
 
 bool Channel::IsReading() const {
@@ -65,23 +58,6 @@ bool Channel::IsWriting() const {
 bool Channel::IsNoneEvent() const {
   return events_ == static_cast<int>(FDEvent::None);
 }
-void Channel::update() {
-  loop_->UpdateChannel(this);
-}
-
-int Channel::Index() const {
-  return index_;
-}
-void Channel::SetIndex(int index) {
-  index_ = index;
-}
-
-EventLoop* Channel::OwnerLoop() {
-  return loop_;
-}
-void Channel::Remove() {
-  loop_->RemoveChannel(this);
-}
 
 // TODO 什么时候会调用？
 void Channel::Tie(const std::shared_ptr<void>& obj) {
@@ -90,38 +66,40 @@ void Channel::Tie(const std::shared_ptr<void>& obj) {
   tied_ = true;
 }
 
-void Channel::HandleEvent(const TimeStamp& receiveTime) {
+void Channel::ExecCallback(void* arg, FDEvent event) {
   if (tied_) {
     // 尝试弱指针提升强指针
     std::shared_ptr<void> guard = tie_.lock();
     // 如果成功，说明Channel仍然有效，否则已经释放了
     if (guard) {
-      HandleEventWithGuard(receiveTime);
+      execCallbackWithGuard(arg, event);
     } else {
       Warn("channel object already down.");
     }
   } else {
-    HandleEventWithGuard(receiveTime);
+    execCallbackWithGuard(arg, event);
   }
 }
-
 // TODO
 // 这个事件是转义的,需要在poller那里做好适配
-void Channel::HandleEventWithGuard(const TimeStamp& receiveTime) {
-  if ((revents_ & static_cast<int>(FDEvent::ReadEvent)) && readCallback_) {
-    Debug("fd = %d events = %d handle read event", fd_, revents_);
-    readCallback_(receiveTime);
+void Channel::execCallbackWithGuard(void* arg, FDEvent event) {
+  if ((event == FDEvent::ReadEvent) && readCallback_) {
+    Debug("Fd = %d Events = %d handle read event", fd_, event);
+    readCallback_(arg);
   }
-  if ((revents_ & static_cast<int>(FDEvent::WriteEvent)) && writeCallback_) {
-    Debug("fd = %d events = %d handle write event", fd_, revents_);
-    writeCallback_(receiveTime);
+  if ((event == FDEvent::WriteEvent) && writeCallback_) {
+    Debug("Fd = %d Events = %d handle write event", fd_, event);
+    writeCallback_(arg);
   }
-  if (revents_ & static_cast<int>(FDEvent::ErrorEvent) && errorCallback_) {
-    Debug("fd = %d events = %d handle error event", fd_, revents_);
-    errorCallback_(receiveTime);
+  if ((event == FDEvent::ErrorEvent) && errorCallback_) {
+    Debug("Fd = %d Events = %d handle error event", fd_, event);
+    errorCallback_(arg);
   }
-  if (revents_ & static_cast<int>(FDEvent::CloseEvent) && closeCallback_) {
-    Debug("fd = %d events = %d handle close event", fd_, revents_);
-    closeCallback_(receiveTime);
+  if ((event == FDEvent::CloseEvent) && closeCallback_) {
+    Debug("Fd = %d Events = %d handle close event", fd_, event);
+    closeCallback_(arg);
   }
+}
+void* Channel::Arg() {
+  return arg_;
 }

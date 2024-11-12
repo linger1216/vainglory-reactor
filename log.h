@@ -1,12 +1,13 @@
 #pragma once
 #include <chrono>
+#include <cstring>
 #include <ctime>
+#include <iomanip>
 #include <iostream>
 #include <sstream>
-#include <cstring>
-#include <iomanip>
 
 #define FILE_NAME strrchr(__FILE__, '/') ? strrchr(__FILE__, '/') + 1 : __FILE__
+#define LOG_ARGS(args, ...) args##__VA_ARGS__
 
 #if DEBUG
 #define LOG(type, fmt, args...)                                                                                      \
@@ -17,9 +18,10 @@
     std::tm now_tm = *std::localtime(&now_c);                                                                        \
     auto now_ms = std::chrono::duration_cast<std::chrono::milliseconds>(now.time_since_epoch()) % 1000;              \
     ss << std::put_time(&now_tm, "%Y-%m-%d %H:%M:%S") << '.' << std::setfill('0') << std::setw(3) << now_ms.count(); \
-    ss << " [" << type << "] " << std::string(FILE_NAME) << "@" << __FUNCTION__ << ", line:" << __LINE__ << " ";                        \
+    ss << " [" << type << "] " << std::string(FILE_NAME) << "@" << __FUNCTION__ << ", line:" << __LINE__ << " ";     \
     ss << fmt;                                                                                                       \
-    std::cout << ss.str() << std::endl;                                                                              \
+    printf(ss.str().c_str(), ##args);                                                                                \
+    printf("\n");                                                                                                    \
   } while (0)
 #define Debug(fmt, args...) LOG("DEBUG", fmt, ##args)
 #define Info(fmt, args...) LOG("INFO", fmt, ##args)

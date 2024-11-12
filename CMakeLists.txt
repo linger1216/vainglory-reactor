@@ -17,10 +17,21 @@ add_executable(vainglory_reactor main.cc
         time_stamp.h
         inet_address.cc
         inet_address.h
-        tcp_server.cc
-        tcp_server.h
         channel.cc
         channel.h
         fd_event.h
         epoll_dispatcher.cc
-        epoll_dispatcher.h)
+        epoll_dispatcher.h
+        dispatcher.h
+        op_event.h
+        work_thread.h
+        work_thread.cc
+        thread_pool.h
+        thread_pool.cc
+        tcp_connection.h
+        tcp_connection.cc
+        tcp_server.h
+        tcp_server.cc
+        buffer.h
+        buffer.cc
+)

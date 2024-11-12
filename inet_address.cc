@@ -4,7 +4,6 @@
 
 #include "inet_address.h"
 #include <cstring>
-
 INetAddress::INetAddress(uint16_t port, const std::string &ip) {
   // ipv4
   memset(&addr_, 0, sizeof(addr_));

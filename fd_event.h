@@ -18,5 +18,22 @@ enum class FDEvent {
   CloseEvent = 0x01 << 3
 };
 
+inline const char* FDEventToString(FDEvent event) {
+  switch (event) {
+    case FDEvent::None:
+      return "None";
+    case FDEvent::ErrorEvent:
+      return "ErrorEvent";
+    case FDEvent::ReadEvent:
+      return "ReadEvent";
+    case FDEvent::WriteEvent:
+      return "WriteEvent";
+    case FDEvent::CloseEvent:
+      return "CloseEvent";
+    default:
+      return "UnknownEvent";
+  }
+}
+
 
 #endif //VAINGLORY_REACTOR_FD_EVENT_H
