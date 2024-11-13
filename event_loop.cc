@@ -170,6 +170,8 @@ int EventLoop::AddTask(Channel* channel, EventLoopOperator type) {
   }
   return 0;
 }
+
+// 释放channel资源
 int EventLoop::FreeChannel(Channel* channel) {
   auto it = fd2ChannelMap_.find(channel->Fd());
   if (it != fd2ChannelMap_.end()) {
