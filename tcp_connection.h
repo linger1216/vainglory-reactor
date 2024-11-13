@@ -20,10 +20,10 @@ public:
   explicit TcpConnection(int fd, EventLoop* eventLoop);
 
 private:
-  int readHandler(const TimeStamp& timeStamp);
-  int writeHandler(const TimeStamp& timeStamp);
-  int closeHandler(const TimeStamp& timeStamp);
-  int destroyHandler(const TimeStamp& timeStamp);
+  int readHandler(void* arg);
+  int writeHandler(void* arg);
+  int closeHandler(void* arg);
+  int destroyHandler(void* arg);
 
 private:
   const int BUFFER_SIZE = 10240;

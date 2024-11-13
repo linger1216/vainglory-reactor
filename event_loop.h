@@ -57,6 +57,8 @@ public:
   // 添加任务到任务队列
   int AddTask(Channel* channel, EventLoopOperator type);
 
+  // 删除channel对象
+  int FreeChannel(Channel* channel);
 private:
   const int TIMEOUT_MS = 10000;
   struct Node {

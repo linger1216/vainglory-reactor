@@ -19,10 +19,12 @@ TcpServer::TcpServer(unsigned short port, int threadNum)
   mainEventLoop_ = new EventLoop();
   threadPool_ = new ThreadPool(mainEventLoop_, threadNum);
   listen();
+  Debug("Server %s is start", netAddress_->IpPort().c_str());
 }
 
 
 TcpServer::~TcpServer() {
+  Debug("Server %s is down", netAddress_->IpPort().c_str());
   close(fd_);
   delete netAddress_;
   delete threadPool_;
@@ -36,7 +38,9 @@ int TcpServer::Run() {
                                      FDEvent::ReadEvent,
                                      std::bind(&TcpServer::acceptConnection, this),
                                      nullptr,
-                                     nullptr, nullptr);
+                                     nullptr,
+                                     nullptr,
+                                     this);
   mainEventLoop_->AddTask(listenerChannel, EventLoopOperator::Add);
   mainEventLoop_->Run();
   return 0;

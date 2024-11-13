@@ -8,6 +8,28 @@
 #include "channel.h"
 #include "log.h"
 
+
+
+TcpConnection::TcpConnection(int fd, EventLoop* eventLoop)
+: _eventLoop(eventLoop){
+  _name = "TcpConnection-" + std::to_string(fd);
+  _readBuf = new Buffer(BUFFER_SIZE);
+  _writeBuf = new Buffer(BUFFER_SIZE);
+
+  auto readHandler = std::bind(&TcpConnection::readHandler,this, std::placeholders::_1);
+  auto writeHandler = std::bind(&TcpConnection::writeHandler,this, std::placeholders::_1);
+  auto destroyHandler = std::bind(&TcpConnection::destroyHandler,this, std::placeholders::_1);
+
+  _channel = new Channel(fd, FDEvent::ReadEvent,
+                         readHandler,
+                         writeHandler,
+                         nullptr,
+                         destroyHandler,
+                         this);
+
+  _eventLoop->AddTask(_channel, EventLoopOperator::Add);
+}
+
 TcpConnection::~TcpConnection() {
   delete _readBuf;
   delete _writeBuf;
@@ -16,55 +38,38 @@ TcpConnection::~TcpConnection() {
   Debug("连接断开, 释放资源, connName: %s", _name.c_str());
 }
 
-TcpConnection::TcpConnection(int fd, EventLoop* eventLoop)
-: _eventLoop(eventLoop){
-  _name = "TcpConnection-" + std::to_string(fd);
-  _readBuf = new Buffer(BUFFER_SIZE);
-  _writeBuf = new Buffer(BUFFER_SIZE);
-
-  auto readHandler = std::bind(&TcpConnection::readHandler,
-                               this, std::placeholders::_1);
-  auto writeHandler = std::bind(&TcpConnection::writeHandler,
-                                this, std::placeholders::_1);
-  auto destroyHandler = std::bind(&TcpConnection::destroyHandler,
-                                  this, std::placeholders::_1);
-
-  _channel = new Channel(fd, FDEvent::ReadEvent, readHandler, writeHandler,
-                         nullptr, destroyHandler, this);
-  _eventLoop->AddTask(_channel, EventLoopOperator::Add);
-}
-int TcpConnection::readHandler(const TimeStamp& timeStamp) {
+int TcpConnection::readHandler(void* arg) {
 
   auto conn = static_cast<TcpConnection*>(arg);
 
-  int count = conn->_readBuf->ReadSocket(conn->_channel->GetSocket());
+  int count = conn->_readBuf->ReadSocket(conn->_channel->Fd());
   if (count > 0) {
     Debug("read %d bytes\n", count);
   } else {
     // 没有读到数据，关闭连接
-    Debug("read 0 bytes\n");
-    conn->_eventLoop->AddTask(conn->_channel, EventLoopOperator::Remove);
+    Debug("read 0 bytes, means connection is down, so we close connection\n");
+    conn->_eventLoop->AddTask(conn->_channel, EventLoopOperator::Delete);
   }
   return 0;
 }
 
-int TcpConnection::writeHandler(const TimeStamp& timeStamp) {
+int TcpConnection::writeHandler(void* arg) {
   auto conn = static_cast<TcpConnection*>(arg);
-  int count = conn->_writeBuf->SendSocket(conn->_channel->GetSocket());
+  int count = conn->_writeBuf->SendSocket(conn->_channel->Fd());
   if (count > 0) {
     if (conn->_writeBuf->GetWriteableSize() == 0) {
       Debug("write %d bytes\n", count);
-      conn->_channel->EnableWriteEvent(false);
+      conn->_channel->EnableWriting();
     }
   } else {
     // 没有写到数据，关闭连接
-    Debug("write 0 bytes\n");
-    conn->_eventLoop->AddTask(conn->_channel, EventLoopOperator::Remove);
+    Debug("write 0 bytes, means connection is down, so we close connection\n");
+    conn->_eventLoop->AddTask(conn->_channel, EventLoopOperator::Delete);
   }
   return 0;
 }
 
-int TcpConnection::destroyHandler(const TimeStamp& timeStamp) {
+int TcpConnection::destroyHandler(void* arg) {
   auto conn = static_cast<TcpConnection*>(arg);
   delete conn;
   return 0;

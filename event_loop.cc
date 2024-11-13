@@ -18,13 +18,13 @@ EventLoop::EventLoop(const char* threadName)
     : threadId_(std::this_thread::get_id()),
       threadName_(threadName),
       isRunning_(false),
-      dispatcher_(new EpollDispatcher(this)){
+      dispatcher_(new EpollDispatcher(this)) {
 
   fd2ChannelMap_.clear();
 
   // TODO
   // 开启读事件, 每个EventLoop都将监听Epoll的EpollIN事件
-  wakeupFd_ =  ::eventfd(0, EFD_NONBLOCK | EFD_CLOEXEC);
+  wakeupFd_ = ::eventfd(0, EFD_NONBLOCK | EFD_CLOEXEC);
   if (wakeupFd_ < 0) {
     Error("create event fd failed");
   }
@@ -32,10 +32,11 @@ EventLoop::EventLoop(const char* threadName)
   wakeupChannel_ = new Channel(wakeupFd_, FDEvent::ReadEvent,
                                std::bind(&EventLoop::wakeupTaskRead, this),
                                nullptr,
-                               nullptr, nullptr);
-  AddTask(wakeupChannel_, EventLoopOperator::Add);
+                               nullptr, nullptr, this);
+  Debug("create wakeup channel fd:%d addr:%p", wakeupFd_, wakeupChannel_);
 
-  Debug("EventLoop created %p in thread %s", this, threadName_.c_str());
+  AddTask(wakeupChannel_, EventLoopOperator::Add);
+  Debug("EventLoop:%s is start, addr:%p", threadName, this);
 }
 
 EventLoop::~EventLoop() {
@@ -84,7 +85,7 @@ void EventLoop::wakeupTaskRead() const {
 void EventLoop::wakeupTask() const {
   uint64_t one = 1;
   ssize_t n = ::write(wakeupFd_, &one, sizeof(one));
-  if(n != sizeof(one)){
+  if (n != sizeof(one)) {
     Error("EventLoop::wakeupTask() writes %ld bytes instead of 8", n);
   }
 }
@@ -154,15 +155,27 @@ int EventLoop::handleModifyOperatorTask(Channel* channel) {
   return 0;
 }
 int EventLoop::AddTask(Channel* channel, EventLoopOperator type) {
+  Debug("AddTask %p", channel);
   assert(channel != nullptr);
   {
     std::lock_guard<std::mutex> locker(mutex_);
     taskQueue_.push(new Node(channel, type));
   }
   if (!IsInLoopThread()) {
+    Debug("EventLoop::AddTask() in other thread");
     wakeupTask();
   } else {
+    Debug("EventLoop::AddTask() in loop thread");
     processTask();
+  }
+  return 0;
+}
+int EventLoop::FreeChannel(Channel* channel) {
+  auto it = fd2ChannelMap_.find(channel->Fd());
+  if (it != fd2ChannelMap_.end()) {
+    fd2ChannelMap_.erase(it);
+    close(channel->Fd());
+    delete channel;
   }
   return 0;
 }

@@ -27,11 +27,13 @@ std::string INetAddress::Ip() const {
 }
 
 std::string INetAddress::IpPort() const {
-  char buf [64];
+  char buf[64];
   memset(buf, 0, sizeof(buf));
   // 网络字节序转本地字节序
   ::inet_ntop(AF_INET, &addr_.sin_addr, buf, sizeof(buf));
-  snprintf(buf, sizeof(buf), "%s:%u", buf, ntohs(addr_.sin_port));
+  // 确保inet_ntop之后buf后面有足够的空间来添加端口号
+  int len = static_cast<int>(strlen(buf));
+  snprintf(buf + len, sizeof(buf) - len, ":%u", ntohs(addr_.sin_port));
   return buf;
 }
 
