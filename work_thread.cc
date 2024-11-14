@@ -8,7 +8,7 @@
 
 WorkThread::WorkThread(int index)
     : thread_(nullptr), eventLoop_(nullptr) {
-  name_ = "work_thread_" + std::to_string(index);
+  name_ = "WorkThread:" + std::to_string(index);
 }
 
 WorkThread::~WorkThread() {
@@ -18,19 +18,19 @@ WorkThread::~WorkThread() {
 
 //
 void WorkThread::Run(){
+  Debug("%s run", name_.c_str());
   thread_ = new std::thread(&WorkThread::subRun, this);
-
   // 如果没有条件变量， 可能在Run执行完成后，eventLoop还没有初始化完成，
   // 在后期使用_eventLoop的时候，可能造成空指针异常，导致程序崩溃。
   std::unique_lock<std::mutex> uniqueLock(mutex_);
   while (eventLoop_ == nullptr) {
     // 等待条件变量唤醒
+    Debug("%s wait condition", name_.c_str());
     cond_.wait(uniqueLock);
   }
 }
 
 void WorkThread::subRun(){
-  Debug("sub thread %s run\n", name_.c_str());
   {
     std::lock_guard<std::mutex> locker(mutex_);
     eventLoop_ = new EventLoop(name_.c_str());

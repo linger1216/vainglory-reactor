@@ -35,6 +35,7 @@ public:
   int Fd() const;
   int Events() const;
 
+  const char* EventsToString() const;
   // 控制监听事件
   void EnableReading();
   void DisableReading();

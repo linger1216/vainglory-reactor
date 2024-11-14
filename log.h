@@ -105,7 +105,7 @@ static inline void logy_header(const char* tag) {
   strftime(timestamp, sizeof(timestamp), "[%Y-%m-%d %H:%M:%S", &now_tm);
   std::snprintf(timestamp + std::strlen(timestamp), sizeof(timestamp) - std::strlen(timestamp), ".%03ld]", now_ms);
 
-//  std::string pos = std::string(FILE_NAME) + "@" + __FUNCTION__;
+//  std::string pos = std::string(__FILE__);
   // 输出到stderr
   std::fprintf(stderr, "%s[%s] ", timestamp, tag);
 }

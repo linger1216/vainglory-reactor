@@ -103,3 +103,6 @@ void Channel::execCallbackWithGuard(void* arg, FDEvent event) {
 void* Channel::Arg() {
   return arg_;
 }
+const char* Channel::EventsToString() const {
+  return FDEventToString(static_cast<FDEvent>(events_));
+}

@@ -88,7 +88,6 @@ int EpollDispatcher::epollControl(Channel* channel, int op) const {
   if (channel->IsWriting()) {
     events |= EPOLLOUT;
   }
-
   epoll_event ev{};
   memset(&ev, 0, sizeof(ev));
   ev.data.fd = channel->Fd();

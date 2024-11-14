@@ -20,23 +20,21 @@ EventLoop::EventLoop(const char* threadName)
       isRunning_(false),
       dispatcher_(new EpollDispatcher(this)) {
 
+  Debug("%s is create, addr:%p", threadName, this);
+
   fd2ChannelMap_.clear();
 
   // TODO
   // 开启读事件, 每个EventLoop都将监听Epoll的EpollIN事件
   wakeupFd_ = ::eventfd(0, EFD_NONBLOCK | EFD_CLOEXEC);
   if (wakeupFd_ < 0) {
-    Error("create event fd failed");
+    Error("create wake up event fd failed");
   }
-
   wakeupChannel_ = new Channel(wakeupFd_, FDEvent::ReadEvent,
                                std::bind(&EventLoop::wakeupTaskRead, this),
                                nullptr,
                                nullptr, nullptr, this);
-  Debug("create wakeup channel fd:%d addr:%p", wakeupFd_, wakeupChannel_);
-
   AddTask(wakeupChannel_, EventLoopOperator::Add);
-  Debug("EventLoop:%s is start, addr:%p", threadName, this);
 }
 
 EventLoop::~EventLoop() {
@@ -51,19 +49,20 @@ EventLoop::~EventLoop() {
 void EventLoop::Run() {
   assert(isRunning_ == false);
   isRunning_ = true;
-  Debug("EventLoop %p start looping", this);
+  Debug("EventLoop:%s is running", threadName_.c_str());
   while (isRunning_) {
+    Debug("EventLoop:%s is dispatch", threadName_.c_str());
     dispatcher_->Dispatch(TIMEOUT_MS);
 
     // 执行其他Loop派发过来需要处理的任务
     // main loop 注册一个cb, 需要sub loop来执行
     // 唤醒loop线程, 也就是Dispatch会唤醒，会自动进入到processTask的动作
+    Debug("EventLoop:%s is process task", threadName_.c_str());
     processTask();
   }
   Debug("EventLoop %p quit looping", this);
 }
 void EventLoop::ExecChannelCallback(int fd, FDEvent event) {
-  Debug("channel fd:%d has Event %s", FDEventToString(event));
   auto it = fd2ChannelMap_.find(fd);
   assert(it != fd2ChannelMap_.end());
   Channel* channel = fd2ChannelMap_[fd];
@@ -78,7 +77,7 @@ void EventLoop::wakeupTaskRead() const {
   uint64_t one = 1;
   ssize_t n = ::read(wakeupFd_, &one, sizeof(one));
   if (n != sizeof(one)) {
-    Error("EventLoop::wakeupRead() reads %ld bytes instead of 8", n);
+    Error("wakeupRead reads %ld bytes instead of 8", n);
   }
 }
 
@@ -86,8 +85,9 @@ void EventLoop::wakeupTask() const {
   uint64_t one = 1;
   ssize_t n = ::write(wakeupFd_, &one, sizeof(one));
   if (n != sizeof(one)) {
-    Error("EventLoop::wakeupTask() writes %ld bytes instead of 8", n);
+    Error("wakeupTask writes %ld bytes instead of 8", n);
   }
+  Debug("wakeupTask writes signal");
 }
 
 
@@ -113,6 +113,8 @@ void EventLoop::processTask() {
       taskQueue_.pop();
     }
     if (node == nullptr) continue;
+
+    Debug("processTask node channel:%d【%s】", node->channel->Fd(), EventLoopOperatorToString(node->op));
     switch (node->op) {
       case EventLoopOperator::Add:
         handleAddOperatorTask(node->channel);
@@ -155,17 +157,16 @@ int EventLoop::handleModifyOperatorTask(Channel* channel) {
   return 0;
 }
 int EventLoop::AddTask(Channel* channel, EventLoopOperator type) {
-  Debug("AddTask %p", channel);
   assert(channel != nullptr);
   {
     std::lock_guard<std::mutex> locker(mutex_);
-    taskQueue_.push(new Node(channel, type));
+    auto node = new Node(channel, type);
+    Debug("addTask node channel:%d【%s】", channel->Fd(), EventLoopOperatorToString(type));
+    taskQueue_.push(node);
   }
   if (!IsInLoopThread()) {
-    Debug("EventLoop::AddTask() in other thread");
     wakeupTask();
   } else {
-    Debug("EventLoop::AddTask() in loop thread");
     processTask();
   }
   return 0;
@@ -180,4 +181,7 @@ int EventLoop::FreeChannel(Channel* channel) {
     delete channel;
   }
   return 0;
+}
+std::thread::id EventLoop::GetThreadId() const {
+  return threadId_;
 }

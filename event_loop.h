@@ -31,6 +31,21 @@ enum class EventLoopOperator:char {
   Delete = 2,
 };
 
+
+inline const char* EventLoopOperatorToString(EventLoopOperator event) {
+  switch (event) {
+    case EventLoopOperator::Add:
+      return "Add";
+    case EventLoopOperator::Update:
+      return "Update";
+    case EventLoopOperator::Delete:
+      return "Delete";
+    default:
+      return "Unknown";
+  }
+}
+
+
 class Channel;
 class IDispatcher;
 
@@ -47,6 +62,7 @@ public:
   // 退出事件循环
   void Quit();
 
+  std::thread::id GetThreadId() const;
   // 判断当前loop是否在自己的线程中
   bool IsInLoopThread() const;
 

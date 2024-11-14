@@ -16,7 +16,6 @@ ThreadPool::~ThreadPool() {
   }
 }
 
-
 ThreadPool::ThreadPool(EventLoop* mainEventLoop, int threadNum)
     : mainEventLoop_(mainEventLoop),
       threadNum_(threadNum),
@@ -25,10 +24,11 @@ ThreadPool::ThreadPool(EventLoop* mainEventLoop, int threadNum)
   for (int i = 0; i < threadNum_; ++i) {
     threads_.push_back(new WorkThread(i));
   }
+  Debug("ThreadPool is created %d thread", threadNum_);
 }
 
 void ThreadPool::Run() {
-  if (mainEventLoop_->IsInLoopThread()) {
+  if (!mainEventLoop_->IsInLoopThread()) {
     Error("main thread should call Run");
   }
   isRunning_ = true;

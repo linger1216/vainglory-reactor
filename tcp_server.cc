@@ -19,7 +19,7 @@ TcpServer::TcpServer(unsigned short port, int threadNum)
   mainEventLoop_ = new EventLoop();
   threadPool_ = new ThreadPool(mainEventLoop_, threadNum);
   listen();
-  Debug("Server %s is start", netAddress_->IpPort().c_str());
+  Debug("Server %s is created", netAddress_->IpPort().c_str());
 }
 
 
@@ -43,6 +43,7 @@ int TcpServer::Run() {
                                      this);
   mainEventLoop_->AddTask(listenerChannel, EventLoopOperator::Add);
   mainEventLoop_->Run();
+  Debug("Server %s is running", netAddress_->IpPort().c_str());
   return 0;
 }
 
