@@ -95,18 +95,13 @@ static inline typename std::enable_if<!is_rangeloop_supported<T>::value, std::st
 //}
 
 static inline void logy_header(const char* tag) {
-  char timestamp[100] = "";
+  char timestamp[256] = "";
   auto now = std::chrono::system_clock::now();
   auto now_c = std::chrono::system_clock::to_time_t(now);
   std::tm now_tm = *std::localtime(&now_c);
   auto now_ms = std::chrono::duration_cast<std::chrono::milliseconds>(now.time_since_epoch() % std::chrono::seconds(1)).count();
-
-  // 格式化时间戳，包括毫秒
   strftime(timestamp, sizeof(timestamp), "[%Y-%m-%d %H:%M:%S", &now_tm);
   std::snprintf(timestamp + std::strlen(timestamp), sizeof(timestamp) - std::strlen(timestamp), ".%03ld]", now_ms);
-
-//  std::string pos = std::string(__FILE__);
-  // 输出到stderr
   std::fprintf(stderr, "%s[%s] ", timestamp, tag);
 }
 
@@ -123,32 +118,36 @@ static inline void logy_helper(F first, R&&... rest) {
 // good old printf syntax
 
 template<typename... T>
-void _Debug(T... args) {
+void _Debug(const char* file, int line, const char* func, T... args) {
   logy_header("DEBUG");
+  std::fprintf(stderr, "[%s:%d] [%s] ", file, line, func);
   std::fprintf(stderr, args...);
   std::fprintf(stderr, "\n");
   std::fflush(stderr);
 }
 
 template<typename... T>
-void _Info(T... args) {
+void _Info(const char* file, int line, const char* func, T... args) {
   logy_header("INFO");
+  std::fprintf(stderr, "[%s:%d] [%s] ", file, line, func);
   std::fprintf(stderr, args...);
   std::fprintf(stderr, "\n");
   std::fflush(stderr);
 }
 
 template<typename... T>
-void _Warning(T... args) {
+void _Warning(const char* file, int line, const char* func, T... args) {
   logy_header("WARNING");
+  std::fprintf(stderr, "[%s:%d] [%s] ", file, line, func);
   std::fprintf(stderr, args...);
   std::fprintf(stderr, "\n");
   std::fflush(stderr);
 }
 
 template<typename... T>
-void _Error(T... args) {
+void _Error(const char* file, int line, const char* func, T... args) {
   logy_header("ERROR");
+  std::fprintf(stderr, "[%s:%d] [%s] ", file, line, func);
   std::fprintf(stderr, args...);
   std::fprintf(stderr, "\n");
   std::fflush(stderr);
@@ -164,22 +163,22 @@ void _Silent(T... args) {
 }
 
 // redundant, strictly speaking, but avoids the unaesthetic format-string-is-not-a-literal warning
-static void _Debug(const char* arg) {
+static void _Debug(const char* file, int line, const char* func, const char* arg) {
   logy_header("DEBUG");
   std::fprintf(stderr, "%s\n", arg);
   std::fflush(stderr);
 }
-static void _Info(const char* arg) {
+static void _Info(const char* file, int line, const char* func, const char* arg) {
   logy_header("INFO");
   std::fprintf(stderr, "%s\n", arg);
   std::fflush(stderr);
 }
-static void _Warning(const char* arg) {
+static void _Warning(const char* file, int line, const char* func, const char* arg) {
   logy_header("WARNING");
   std::fprintf(stderr, "%s\n", arg);
   std::fflush(stderr);
 }
-static void _Error(const char* arg) {
+static void _Error(const char* file, int line, const char* func, const char* arg) {
   logy_header("ERROR");
   std::fprintf(stderr, "%s\n", arg);
   std::fflush(stderr);
@@ -226,10 +225,10 @@ static inline void _Silent2(T... args) {
 
 #if defined(DEBUG) || defined(LOGGING_DEBUG)
 
-#define Debug(...) _Debug(__VA_ARGS__)
-#define Info(...) _Info(__VA_ARGS__)
-#define Warn(...) _Warning(__VA_ARGS__)
-#define Error(...) _Error(__VA_ARGS__)
+#define Debug(...) _Debug(FILE_NAME, __LINE__, __func__, __VA_ARGS__)
+#define Info(...) _Info(FILE_NAME, __LINE__, __func__, __VA_ARGS__)
+#define Warn(...) _Warning(FILE_NAME, __LINE__, __func__, __VA_ARGS__)
+#define Error(...) _Error(FILE_NAME, __LINE__, __func__, __VA_ARGS__)
 #define LOG_DEBUG(...) _Debug2(__VA_ARGS__)
 #define LOG_INFO(...) _Info2(__VA_ARGS__)
 #define LOG_WARN(...) _Warning2(__VA_ARGS__)
