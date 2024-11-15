@@ -34,4 +34,6 @@ add_executable(vainglory_reactor main.cc
         tcp_server.cc
         buffer.h
         buffer.cc
+        tcp_client.cc
+        tcp_client.h
 )
