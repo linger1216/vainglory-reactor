@@ -3,22 +3,32 @@
 //
 
 #include "tcp_connection.h"
-#include "event_loop.h"
+
 #include "buffer.h"
 #include "channel.h"
+#include "event_loop.h"
 #include "log.h"
+#include <utility>
 
 
+TcpConnection::TcpConnection(int fd, EventLoop* eventLoop,
+                             ConnectionCallback connectionCallback,
+                             CloseCallback closeCallback,
+                             MessageCallback messageCallback,
+                             WriteCompleteCallback writeCompleteCallback)
+    : _eventLoop(eventLoop),
+      connectionCallback_(std::move(connectionCallback)),
+      closeCallback_(std::move(closeCallback)),
+      messageCallback_(std::move(messageCallback)),
+      writeCompleteCallback_(std::move(writeCompleteCallback)) {
 
-TcpConnection::TcpConnection(int fd, EventLoop* eventLoop)
-: _eventLoop(eventLoop){
   _name = "TcpConnection-" + std::to_string(fd);
   _readBuf = new Buffer(BUFFER_SIZE);
   _writeBuf = new Buffer(BUFFER_SIZE);
 
-  auto readHandler = std::bind(&TcpConnection::readHandler,this, std::placeholders::_1);
-  auto writeHandler = std::bind(&TcpConnection::writeHandler,this, std::placeholders::_1);
-  auto destroyHandler = std::bind(&TcpConnection::destroyHandler,this, std::placeholders::_1);
+  auto readHandler = std::bind(&TcpConnection::readHandler, this, std::placeholders::_1);
+  auto writeHandler = std::bind(&TcpConnection::writeHandler, this, std::placeholders::_1);
+  auto destroyHandler = std::bind(&TcpConnection::destroyHandler, this, std::placeholders::_1);
 
   _channel = new Channel(fd, FDEvent::ReadEvent,
                          readHandler,
@@ -39,9 +49,7 @@ TcpConnection::~TcpConnection() {
 }
 
 int TcpConnection::readHandler(void* arg) {
-
   auto conn = static_cast<TcpConnection*>(arg);
-
   int count = conn->_readBuf->ReadSocket(conn->_channel->Fd());
   if (count > 0) {
     Debug("read %d bytes\n", count);

@@ -9,6 +9,7 @@
 #include "no_copyable.h"
 #include <string>
 #include "time_stamp.h"
+#include "callback.h"
 
 class EventLoop;
 class Channel;
@@ -17,7 +18,11 @@ class Buffer;
 class TcpConnection : public NoCopyable{
 public:
   ~TcpConnection();
-  explicit TcpConnection(int fd, EventLoop* eventLoop);
+  explicit TcpConnection(int fd, EventLoop* eventLoop,
+                         ConnectionCallback connectionCallback,
+                         CloseCallback closeCallback,
+                         MessageCallback messageCallback,
+                         WriteCompleteCallback writeCompleteCallback);
 
 private:
   int readHandler(void* arg);
@@ -32,6 +37,12 @@ private:
   Channel* _channel;
   Buffer* _readBuf;
   Buffer* _writeBuf;
+
+  ConnectionCallback connectionCallback_;
+  MessageCallback messageCallback_;
+  CloseCallback closeCallback_;
+  WriteCompleteCallback writeCompleteCallback_;
+  HighWaterMarkCallback highWaterMarkCallback_;
 };
 
 

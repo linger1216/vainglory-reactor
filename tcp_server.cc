@@ -11,11 +11,19 @@
 #include "thread_pool.h"
 #include <arpa/inet.h>
 #include <unistd.h>
+
+#include <utility>
 #include "log.h"
 
-TcpServer::TcpServer(unsigned short port, int threadNum)
+TcpServer::TcpServer(unsigned short port, int threadNum,
+                     ConnectionCallback connectionCallback,
+                     MessageCallback messageCallback,
+                     WriteCompleteCallback writeCompleteCallback)
     : fd_(-1),
-      netAddress_(new INetAddress(port, "127.0.0.1")) {
+      netAddress_(new INetAddress(port, "127.0.0.1")),
+      connectionCallback_(std::move(connectionCallback)),
+      messageCallback_(std::move(messageCallback)),
+      writeCompleteCallback_(std::move(writeCompleteCallback)){
   mainEventLoop_ = new EventLoop();
   threadPool_ = new ThreadPool(mainEventLoop_, threadNum);
   listen();
@@ -64,11 +72,16 @@ int TcpServer::acceptConnection() {
   // TODO：
   // 得到了client id后，不能在主线程中去处理通信的相关流程了
   // 需要从线程池得到一个合适的工作线程， 委托他使用Tcp Connection来通信相关处理
-  EventLoop* eventLoop = threadPool_->TakeEventLoop();
+  EventLoop* ioLoop = threadPool_->TakeEventLoop();
 
   // TODO:
   // 新建的tcpConnection资源什么时候释放？
-  new TcpConnection(clientFd, eventLoop);
+  auto conn = new TcpConnection(clientFd, ioLoop);
+
+  char buf[32];
+  snprintf(buf, sizeof buf, "#%d", clientFd);
+  std::string connName = std::string("conn") + buf;
+  connections_[connName] = conn;
 
   return 0;
 }
@@ -76,7 +89,7 @@ int TcpServer::acceptConnection() {
 
 void TcpServer::listen() {
   // 1. 创建监听的fd
-  fd_ = socket(AF_INET, SOCK_STREAM, 0);
+  fd_ = ::socket(AF_INET, SOCK_STREAM, 0);
   if (fd_ == -1) {
     Error("create socket error");
   }

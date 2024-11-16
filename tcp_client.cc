@@ -4,10 +4,12 @@
 
 #include "tcp_client.h"
 
+#include <utility>
+
 TcpClient::TcpClient(EventLoop* loop,
-                     const INetAddress& servAddr,
+                     const INetAddress& addr,
                      const std::string& name)
-    : loop_(loop), name_(name) {
+    : loop_(loop), addr_(addr), name_(name) {
 }
 TcpClient::~TcpClient() {
 }

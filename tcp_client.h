@@ -15,13 +15,9 @@ class EventLoop;
 class TcpConnection;
 class Buffer;
 
-using ConnectionCallback = std::function<void (const TcpConnection& conn)>;
-using MessageCallback = std::function<void (const TcpConnection& conn, Buffer*, int n)>;
-using WriteCompleteCallback = std::function<void (const TcpConnection& conn)>;
-
 class TcpClient : public NoCopyable {
 public:
-  TcpClient(EventLoop* loop, const INetAddress& servAddr, const std::string& name);
+  TcpClient(EventLoop* loop, const INetAddress& addr, const std::string& name);
   ~TcpClient();
   void Connect();
   void Disconnect();
@@ -30,6 +26,7 @@ public:
   void SetMessageCallback(const MessageCallback& cb);
   void SetWriteCompleteCallback(const WriteCompleteCallback& cb);
 private:
+  INetAddress addr_;
   EventLoop* loop_;
   std::string name_;
   TcpConnection* conn_;

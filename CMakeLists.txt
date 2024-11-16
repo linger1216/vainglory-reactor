@@ -36,4 +36,9 @@ add_executable(vainglory_reactor main.cc
         buffer.cc
         tcp_client.cc
         tcp_client.h
+        callback.h
+        socket.cc
+        socket.h
+        socket_helper.cc
+        socket_helper.h
 )
