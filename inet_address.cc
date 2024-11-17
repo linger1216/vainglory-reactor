@@ -4,43 +4,50 @@
 
 #include "inet_address.h"
 #include <cstring>
-INetAddress::INetAddress(uint16_t port, const std::string &ip) {
-  // ipv4
-  memset(&addr_, 0, sizeof(addr_));
-  addr_.sin_family = AF_INET;
-  addr_.sin_port = htons(port);
-  if (ip.empty()) {
-    addr_.sin_addr.s_addr = INADDR_ANY;
+#include "network_encode.h"
+#include "socket_helper.h"
+INetAddress::INetAddress(uint16_t port, bool loopbackOnly, bool ipv6) {
+  if (ipv6) {
+    std::memset(&addr6_, 0, sizeof(addr6_));
+    addr6_.sin6_family = AF_INET6;
+    auto ip = loopbackOnly? in6addr_loopback : in6addr_any;
+    addr6_.sin6_addr = ip;
+    addr6_.sin6_port = hostToNetwork16(port);
   } else {
-    addr_.sin_addr.s_addr = inet_addr(ip.c_str());
+    std::memset(&addr_, 0, sizeof(addr_));
+    addr_.sin_family = AF_INET;
+    auto ip = loopbackOnly? INADDR_LOOPBACK : INADDR_ANY;
+    addr_.sin_port = hostToNetwork16(port);
   }
 }
+
 INetAddress::INetAddress(const sockaddr_in &addr):addr_(addr) {
+}
+
+INetAddress::INetAddress(const sockaddr_in6& addr):addr6_(addr) {
 }
 
 std::string INetAddress::Ip() const {
   char buf [64];
-  memset(buf, 0, sizeof(buf));
-  // 网络字节序转本地字节序
-  ::inet_ntop(AF_INET, &addr_.sin_addr, buf, sizeof(buf));
+  std::memset(buf, 0, sizeof(buf));
+  SocketHelper::ToIp(buf, sizeof(buf), GetSockAddr());
   return buf;
 }
 
 std::string INetAddress::IpPort() const {
   char buf[64];
-  memset(buf, 0, sizeof(buf));
-  // 网络字节序转本地字节序
-  ::inet_ntop(AF_INET, &addr_.sin_addr, buf, sizeof(buf));
-  // 确保inet_ntop之后buf后面有足够的空间来添加端口号
-  int len = static_cast<int>(strlen(buf));
-  snprintf(buf + len, sizeof(buf) - len, ":%u", ntohs(addr_.sin_port));
+  std::memset(buf, 0, sizeof(buf));
+  SocketHelper::ToIpPort(buf, sizeof(buf), GetSockAddr());
   return buf;
 }
 
 uint16_t INetAddress::Port() const {
-  return ntohs(addr_.sin_port);
+  return networkToHost16(addr_.sin_port);
 }
 
-const sockaddr_in *INetAddress::GetSockAddr() const {
-  return &addr_;
+const sockaddr *INetAddress::GetSockAddr() const {
+  return SocketHelper::to_sockaddr(&addr6_);
+}
+void INetAddress::SetSockAddrInet6(const sockaddr_in6& addr6) {
+  addr6_ = addr6;
 }

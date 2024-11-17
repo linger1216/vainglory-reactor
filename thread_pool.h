@@ -17,7 +17,7 @@ public:
 
 public:
   void Run();
-  EventLoop* TakeEventLoop();
+  EventLoop* GetNextEventLoop();
 private:
   EventLoop* mainEventLoop_;
 

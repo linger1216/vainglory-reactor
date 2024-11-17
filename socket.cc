@@ -3,12 +3,13 @@
 //
 
 #include "socket.h"
+#include "socket_helper.h"
 #include <cstring>
-#include <unistd.h>
 #include <netinet/in.h>
 #include <netinet/tcp.h>
-
-Socket::Socket(int sockfd): sockfd_(sockfd) {
+#include <unistd.h>
+#include "inet_address.h"
+Socket::Socket(int socketFd): sockfd_(socketFd) {
 }
 
 Socket::~Socket() {
@@ -25,7 +26,7 @@ int Socket::GetTcpInfo(struct tcp_info* tcpi) const {
   return getsockopt(sockfd_, SOL_TCP, TCP_INFO, tcpi, &len);
 }
 
-std::string Socket::GetTcpInfoString() {
+std::string Socket::GetTcpInfoString() const {
   struct tcp_info tcpi;
   if (0 == GetTcpInfo(&tcpi)) {
     char buf[128];
@@ -47,28 +48,43 @@ std::string Socket::GetTcpInfoString() {
   return "";
 }
 
-void Socket::BindAddress(const INetAddress& addr) {
-
+void Socket::BindAddress(const INetAddress& addr) const {
+  SocketHelper::Bind(sockfd_, addr.GetSockAddr());
 }
 
-void Socket::Listen() {
+void Socket::Listen() const {
+  SocketHelper::Listen(sockfd_);
 }
 
-int Socket::Accept(INetAddress* peeraddr) {
-  return 0;
+/*
+ * 连接成功，将客户端的地址信息设置到 peerAddr 中
+ */
+int Socket::Accept(INetAddress* peerAddr) const {
+  struct sockaddr_in6 addr;
+  std::memset(&addr, 0, sizeof addr);
+  int clientFd = SocketHelper::Accept(sockfd_, &addr);
+  if (clientFd >= 0) {
+    peerAddr->SetSockAddrInet6(addr);
+  }
+  return clientFd;
 }
 
-void Socket::ShutdownWrite() {
+void Socket::ShutdownWrite() const {
+  SocketHelper::ShutdownWrite(sockfd_);
 }
 
-void Socket::SetTcpNoDelay(bool on) {
+void Socket::SetTcpNoDelay(bool on) const {
+  SocketHelper::SetTcpNoDelay(sockfd_, on);
 }
 
-void Socket::SetReuseAddr(bool on) {
+void Socket::SetReuseAddr(bool on) const {
+  SocketHelper::SetReuseAddr(sockfd_, on);
 }
 
-void Socket::SetReusePort(bool on) {
+void Socket::SetReusePort(bool on) const {
+  SocketHelper::SetReusePort(sockfd_, on);
 }
 
-void Socket::SetKeepAlive(bool on) {
+void Socket::SetKeepAlive(bool on) const {
+  SocketHelper::SetKeepAlive(sockfd_, on);
 }

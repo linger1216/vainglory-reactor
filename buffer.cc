@@ -80,7 +80,7 @@ int Buffer::ReadSocket(int fd) {
 
   int TEMP_BUFFER_SIZE = 40960;
   char* tmp = new char [TEMP_BUFFER_SIZE];
-  memset(tmp, 0, TEMP_BUFFER_SIZE);
+  std::memset(tmp, 0, TEMP_BUFFER_SIZE);
   iov[0].iov_base = tmp;
   iov[0].iov_len = TEMP_BUFFER_SIZE;
   int n = static_cast<int>(readv(fd, iov, 2));
@@ -103,11 +103,11 @@ int Buffer::SendSocket(int socket) {
                                       readable, MSG_NOSIGNAL));
     if (count > 0) {
       readOffset_ += count;
-
-      // TODO: 优化
-      usleep(1);
     }
     return count;
   }
   return 0;
+}
+void Buffer::ReadAll(char* dst, int size) {
+  memcpy(dst, data_ + readOffset_, size);
 }

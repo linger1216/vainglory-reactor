@@ -114,7 +114,7 @@ private:
   // 用来保护上述队列的互斥锁
   std::mutex mutex_;
 
-  // _channel Map，映射关系描述符和channel
+  // channel_ Map，映射关系描述符和channel
   std::unordered_map<int, Channel*> fd2ChannelMap_;
 
   // 线程相关

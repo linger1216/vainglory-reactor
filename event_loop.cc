@@ -120,10 +120,10 @@ void EventLoop::processTask() {
         handleAddOperatorTask(node->channel);
         break;
       case EventLoopOperator::Update:
-        handleDeleteOperatorTask(node->channel);
+        handleModifyOperatorTask(node->channel);
         break;
       case EventLoopOperator::Delete:
-        handleModifyOperatorTask(node->channel);
+        handleDeleteOperatorTask(node->channel);
         break;
     }
     delete node;

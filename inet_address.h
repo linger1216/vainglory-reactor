@@ -11,15 +11,19 @@
 
 class INetAddress {
 public:
-  explicit INetAddress(uint16_t port, const std::string& ip = "127.0.0.1");
+  explicit INetAddress(uint16_t port, bool loopbackOnly = false, bool ipv6 = false);
   explicit INetAddress(const struct sockaddr_in& addr);
+  explicit INetAddress(const struct sockaddr_in6& addr);
   std::string Ip() const;
-  // Ip:Port
   std::string IpPort() const;
   uint16_t Port() const;
-  const sockaddr_in* GetSockAddr() const;
+  const sockaddr* GetSockAddr() const;
+  void SetSockAddrInet6(const struct sockaddr_in6& addr6);
 private:
-  sockaddr_in addr_;
+  union {
+    sockaddr_in addr_;
+    sockaddr_in6 addr6_;
+  };
 };
 
 

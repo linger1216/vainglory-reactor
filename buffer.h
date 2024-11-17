@@ -24,6 +24,8 @@ public:
   int ReadSocket(int fd);
   int SendSocket(int socket);
 
+  void ReadAll(char* dst, int size);
+
 private:
   // 指向内存的指针
   char* data_;

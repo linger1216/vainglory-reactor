@@ -11,19 +11,28 @@
 #include "thread_pool.h"
 #include <arpa/inet.h>
 #include <unistd.h>
-
 #include <utility>
+#include "buffer.h"
 #include "log.h"
+#include "socket_helper.h"
 
 TcpServer::TcpServer(unsigned short port, int threadNum,
                      ConnectionCallback connectionCallback,
                      MessageCallback messageCallback,
                      WriteCompleteCallback writeCompleteCallback)
     : fd_(-1),
-      netAddress_(new INetAddress(port, "127.0.0.1")),
+      netAddress_(new INetAddress(port)),
       connectionCallback_(std::move(connectionCallback)),
       messageCallback_(std::move(messageCallback)),
-      writeCompleteCallback_(std::move(writeCompleteCallback)){
+      writeCompleteCallback_(std::move(writeCompleteCallback)) {
+
+  if (connectionCallback_ == nullptr) {
+    connectionCallback_ = std::bind(&TcpServer::defaultConnectionCallback, this, std::placeholders::_1);
+  }
+  if (messageCallback_ == nullptr) {
+    messageCallback_ = std::bind(&TcpServer::defaultMessageCallback, this, std::placeholders::_1, std::placeholders::_2, std::placeholders::_3);
+  }
+
   mainEventLoop_ = new EventLoop();
   threadPool_ = new ThreadPool(mainEventLoop_, threadNum);
   listen();
@@ -56,62 +65,52 @@ int TcpServer::Run() {
 }
 
 int TcpServer::acceptConnection() {
-  // 客户端进行连接
-  auto addr = const_cast<sockaddr_in*>(netAddress_->GetSockAddr());
-  unsigned int client_addr_len = sizeof(*addr);
-  int clientFd = accept(fd_,
-                        (sockaddr*)addr,
-                        &client_addr_len);
-  if (clientFd == -1) {
-    Error("accept connection error");
-  }
 
-  Debug("accept client %s:%d\n", inet_ntoa(addr->sin_addr),
-         ntohs(addr->sin_port));
+  INetAddress peerAddr(0);
+  int clientFd = SocketHelper::Accept(fd_, peerAddr.GetSockAddr());
+  auto peer = SocketHelper::to_sockaddr_in(peerAddr.GetSockAddr());
+  Debug("accept client %s:%d\n", inet_ntoa(peer->sin_addr),
+        ntohs(peer->sin_port));
+
+  INetAddress localAddr(SocketHelper::GetLocalAddr(clientFd));
 
   // TODO：
   // 得到了client id后，不能在主线程中去处理通信的相关流程了
   // 需要从线程池得到一个合适的工作线程， 委托他使用Tcp Connection来通信相关处理
-  EventLoop* ioLoop = threadPool_->TakeEventLoop();
+  EventLoop* ioLoop = threadPool_->GetNextEventLoop();
 
   // TODO:
   // 新建的tcpConnection资源什么时候释放？
-  auto conn = new TcpConnection(clientFd, ioLoop);
-
-  char buf[32];
-  snprintf(buf, sizeof buf, "#%d", clientFd);
-  std::string connName = std::string("conn") + buf;
-  connections_[connName] = conn;
-
+  auto conn = new TcpConnection(clientFd,
+                                ioLoop,
+                                localAddr,
+                                peerAddr,
+                                connectionCallback_,
+                                std::bind(&TcpServer::removeConnection, this, std::placeholders::_1),
+                                messageCallback_,
+                                writeCompleteCallback_);
+  connections_["TcpConnection-" + std::to_string(clientFd)] = conn;
   return 0;
 }
 
 
 void TcpServer::listen() {
-  // 1. 创建监听的fd
-  fd_ = ::socket(AF_INET, SOCK_STREAM, 0);
-  if (fd_ == -1) {
-    Error("create socket error");
-  }
+  fd_ = SocketHelper::CreateSocket(AF_INET);
+  SocketHelper::SetReuseAddr(fd_, true);
+  SocketHelper::SetReusePort(fd_, true);
+  SocketHelper::Bind(fd_, netAddress_->GetSockAddr());
+  SocketHelper::Listen(fd_);
+  Debug("listen on %s", netAddress_->IpPort().c_str());
 
-  // 2. 设置端口复用
-  int opt = 1;
-  int ret = setsockopt(fd_, SOL_SOCKET,
-                       SO_REUSEADDR, &opt, sizeof opt);
-  if (ret == -1) {
-    Error("set socket option SO_REUSEADDR error");
-  }
-
-  // 3. 绑定
-  auto addr = const_cast<sockaddr_in*>(netAddress_->GetSockAddr());
-  ret = bind(fd_, (struct sockaddr*) addr, sizeof(*addr));
-  if (ret == -1) {
-    Error("bind socket error");
-  }
-
-  // 4. 设置监听
-  ret = ::listen(fd_, 128);
-  if (ret == -1) {
-    Error("listen socket error");
-  }
+  // 后面还差一个accept, 其实就是委托channel来实现
+}
+void TcpServer::defaultConnectionCallback(const TcpConnection* conn) {
+}
+void TcpServer::defaultMessageCallback(const TcpConnection* conn, Buffer* buffer, int n) {
+  char* data = new char[n];
+  buffer->ReadAll(data, n);
+  Debug("defaultMessage receive data %s", data);
+  delete []data;
+}
+void TcpServer::removeConnection(const TcpConnection* conn) {
 }

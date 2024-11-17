@@ -6,10 +6,11 @@
 #define REACTOR_CPP_TCP_CONNECTION_H
 
 
-#include "no_copyable.h"
-#include <string>
-#include "time_stamp.h"
 #include "callback.h"
+#include "inet_address.h"
+#include "no_copyable.h"
+#include "time_stamp.h"
+#include <string>
 
 class EventLoop;
 class Channel;
@@ -19,6 +20,8 @@ class TcpConnection : public NoCopyable{
 public:
   ~TcpConnection();
   explicit TcpConnection(int fd, EventLoop* eventLoop,
+                         const INetAddress& localAddr,
+                         const INetAddress& peerAddr,
                          ConnectionCallback connectionCallback,
                          CloseCallback closeCallback,
                          MessageCallback messageCallback,
@@ -28,16 +31,18 @@ private:
   int readHandler(void* arg);
   int writeHandler(void* arg);
   int closeHandler(void* arg);
-  int destroyHandler(void* arg);
+  int errorHandler(void* arg);
 
 private:
   const int BUFFER_SIZE = 10240;
-  std::string _name;
-  EventLoop* _eventLoop;
-  Channel* _channel;
-  Buffer* _readBuf;
-  Buffer* _writeBuf;
+  std::string name_;
+  EventLoop* eventLoop_;
+  Channel* channel_;
+  Buffer* readBuf_;
+  Buffer* writeBuf_;
 
+  INetAddress localAddr_;
+  INetAddress peerAddr_;
   ConnectionCallback connectionCallback_;
   MessageCallback messageCallback_;
   CloseCallback closeCallback_;

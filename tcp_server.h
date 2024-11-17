@@ -25,6 +25,9 @@ public:
 private:
   void listen();
   int acceptConnection();
+  void removeConnection(const TcpConnection* conn);
+  void defaultConnectionCallback(const TcpConnection* conn);
+  void defaultMessageCallback(const TcpConnection* conn, Buffer*, int n);
 private:
   EventLoop* mainEventLoop_;
   ThreadPool* threadPool_;

@@ -37,9 +37,9 @@ void ThreadPool::Run() {
   }
 }
 
-EventLoop* ThreadPool::TakeEventLoop() {
+EventLoop* ThreadPool::GetNextEventLoop() {
   if (mainEventLoop_->IsInLoopThread()) {
-    Error("main thread should call TakeEventLoop");
+    Error("main thread should call GetNextEventLoop");
   }
 
   // 从工作线程中取出一个合适的反应堆实例, 如果工作线程没有， 就用主线程的
