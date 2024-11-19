@@ -67,7 +67,7 @@ int TcpConnection::readHandler(void* arg) {
     messageCallback_(conn, conn->readBuf_, count);
   } else if (count == 0) {
     // 没有读到数据，关闭连接
-    Debug("read 0 bytes, means connection is down, so we close connection\n");
+    Debug("client down, so we close connection [%p]", std::this_thread::get_id());
     conn->eventLoop_->AddTask(conn->channel_, EventLoopOperator::Delete);
   } else {
     Error("read error, error code: %d\n", SocketHelper::GetSocketError(conn->channel_->Fd()));

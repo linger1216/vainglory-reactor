@@ -111,7 +111,7 @@ void EventLoop::processTask() {
       std::lock_guard<std::mutex> locker(mutex_);
       if (taskQueue_.empty()) continue;
       node = taskQueue_.front();
-      taskQueue_.pop();
+      taskQueue_.pop_front();
     }
     if (node == nullptr) continue;
 
@@ -162,9 +162,14 @@ int EventLoop::AddTask(Channel* channel, EventLoopOperator type) {
   {
     std::lock_guard<std::mutex> locker(mutex_);
     auto node = new Node(channel, type);
-    Debug("%s addTask channel:%d【%s】[%p]", threadName_.c_str(), channel->Fd(), EventLoopOperatorToString(type), std::this_thread::get_id());
-    taskQueue_.push(node);
+//    Debug("%s addTask channel:%d【%s】[%p]", threadName_.c_str(), channel->Fd(), EventLoopOperatorToString(type), std::this_thread::get_id());
+//    taskQueue_.push(node);
+    taskQueue_.push_back(node);
   }
+  for(auto iter = taskQueue_.begin(); iter != taskQueue_.end(); iter++) {
+    Debug("%s QUEUE -> channel:%d【%s】[%p]", threadName_.c_str(), channel->Fd(), EventLoopOperatorToString(type), std::this_thread::get_id());
+  }
+
   if (!IsInLoopThread()) {
     wakeupTask();
   } else {

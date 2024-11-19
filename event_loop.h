@@ -9,6 +9,7 @@
 #include "no_copyable.h"
 #include <thread>
 #include <queue>
+#include <list>
 #include <unordered_map>
 #include <string>
 #include <mutex>
@@ -113,7 +114,8 @@ private:
   std::unique_ptr<IDispatcher> dispatcher_;
 
   // 任务队列, 用来存储任务，类似muduo的pending functor
-  std::queue<Node*> taskQueue_;
+//  std::queue<Node*> taskQueue_;
+  std::list<Node*> taskQueue_;
   // 用来保护上述队列的互斥锁
   std::mutex mutex_;
 
