@@ -11,7 +11,7 @@
 #include <sys/eventfd.h>
 #include <sys/socket.h>
 
-EventLoop::EventLoop() : EventLoop("MainThread") {
+EventLoop::EventLoop() : EventLoop("MainEventLoop") {
 }
 
 EventLoop::EventLoop(const char* threadName)
@@ -40,10 +40,11 @@ EventLoop::EventLoop(const char* threadName)
 EventLoop::~EventLoop() {
   Debug("EventLoop %p stop looping", this);
   wakeupChannel_->DisableAll();
-  dispatcher_->Delete(wakeupChannel_);
+  AddTask(wakeupChannel_, EventLoopOperator::Update);
+  AddTask(wakeupChannel_, EventLoopOperator::Delete);
   delete wakeupChannel_;
-  wakeupChannel_ = nullptr;
   close(wakeupFd_);
+  fd2ChannelMap_.clear();
 }
 
 void EventLoop::Run() {
@@ -180,7 +181,7 @@ int EventLoop::AddTask(Channel* channel, EventLoopOperator type) {
 }
 
 // 释放channel资源
-int EventLoop::FreeChannel(Channel* channel) {
+int EventLoop::DestroyChannel(Channel* channel) {
   auto it = fd2ChannelMap_.find(channel->Fd());
   if (it != fd2ChannelMap_.end()) {
     fd2ChannelMap_.erase(it);

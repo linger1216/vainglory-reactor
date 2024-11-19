@@ -14,6 +14,8 @@ void messageCallback(const TcpConnection* conn, Buffer* buffer, int n){
   msg[n] = '\0';
   Debug("recv msg:%s", msg);
   delete []msg;
+
+  buffer->Append("hello");
 }
 
 void writeCallback(const TcpConnection* conn){

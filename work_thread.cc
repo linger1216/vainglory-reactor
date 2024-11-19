@@ -7,7 +7,7 @@
 #include "log.h"
 WorkThread::WorkThread(int index)
     : thread_(nullptr), eventLoop_(nullptr) {
-  name_ = "WorkThread:" + std::to_string(index);
+  name_ = "WorkEventLoop:" + std::to_string(index);
 
   Debug("%s created [%p]", name_.c_str(), std::this_thread::get_id());
 }

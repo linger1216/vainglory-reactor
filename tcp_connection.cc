@@ -51,10 +51,10 @@ TcpConnection::TcpConnection(int fd, EventLoop* eventLoop,
 }
 
 TcpConnection::~TcpConnection() {
+  eventLoop_->DestroyChannel(channel_);
+  delete channel_;
   delete readBuf_;
   delete writeBuf_;
-  eventLoop_->FreeChannel(channel_);
-  delete channel_;
   Debug("%s 释放读写缓冲区,channel内存 [%p]", name_.c_str(), std::this_thread::get_id());
 }
 
