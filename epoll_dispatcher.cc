@@ -39,7 +39,8 @@ int EpollDispatcher::Delete(Channel* channel) {
   // TODO
   // 需要把当前channel的fd资源删除
   // 本意要执行destroy的回调。但tm需要仔细思考思考
-  Debug("底层不在监听channel %d的监听事件, 但还没有清理资源[%p]", channel->Fd(), std::this_thread::get_id());
+  Debug("底层不在监听channel %d的监听事件[%p]", channel->Fd(), std::this_thread::get_id());
+  channel->ExecCallback(channel->Arg(), FDEvent::CloseEvent);
   return 0;
 }
 

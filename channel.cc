@@ -21,7 +21,6 @@ Channel::Channel(int fd, FDEvent events,
 }
 
 Channel::~Channel() {
-  Debug("~Channel need ensure no event to handle.");
 }
 int Channel::Fd() const {
   return fd_;

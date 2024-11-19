@@ -55,7 +55,7 @@ TcpConnection::~TcpConnection() {
   delete writeBuf_;
   eventLoop_->FreeChannel(channel_);
   delete channel_;
-  Debug("连接断开, 释放资源, connName: %s", name_.c_str());
+  Debug("%s 释放读写缓冲区,channel内存 [%p]", name_.c_str(), std::this_thread::get_id());
 }
 
 int TcpConnection::readHandler(void* arg) {
@@ -114,9 +114,7 @@ int TcpConnection::errorHandler(void* arg) {
 int TcpConnection::closeHandler(void* arg) {
   assert(eventLoop_->IsInLoopThread());
   auto conn = static_cast<TcpConnection*>(arg);
-  conn->channel_->DisableAll();
-  conn->eventLoop_->AddTask(channel_, EventLoopOperator::Update);
-  conn->closeCallback_(conn);
+  Debug("closeHandler arg:%p, 准备删除此连接 [%p]", arg, std::this_thread::get_id());
   delete conn;
   return 0;
 }

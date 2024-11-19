@@ -149,6 +149,7 @@ int EventLoop::handleDeleteOperatorTask(Channel* channel) {
   }
   return 0;
 }
+
 int EventLoop::handleModifyOperatorTask(Channel* channel) {
   int fd = channel->Fd();
   auto it = fd2ChannelMap_.find(fd);
@@ -184,7 +185,7 @@ int EventLoop::FreeChannel(Channel* channel) {
   if (it != fd2ChannelMap_.end()) {
     fd2ChannelMap_.erase(it);
     close(channel->Fd());
-    delete channel;
+    Debug("%s 删除fd2ChannelMap_中的channel映射, 关闭fd描述符 [%p]", threadName_.c_str(), std::this_thread::get_id());
   }
   return 0;
 }
