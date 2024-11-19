@@ -58,9 +58,7 @@ int Buffer::GetReadableSize() const {
 
 int Buffer::Append(const char* buf, int size) {
   if (buf == nullptr || size <= 0) return -1;
-
   Extend(size);
-
   memcpy(data_ + writeOffset_, buf, size);
   writeOffset_ += size;
   return size;
@@ -73,16 +71,14 @@ int Buffer::Append(const char* buf) {
 int Buffer::ReadSocket(int fd) {
   int writeable = GetWriteableSize();
 
-  // [2] 长度根据实际需求来
   iovec iov[2];
   iov[0].iov_base = data_ + writeOffset_;
   iov[0].iov_len = writeable;
 
-  int TEMP_BUFFER_SIZE = 40960;
-  char* tmp = new char [TEMP_BUFFER_SIZE];
+  char tmp[TEMP_BUFFER_SIZE];
   std::memset(tmp, 0, TEMP_BUFFER_SIZE);
-  iov[0].iov_base = tmp;
-  iov[0].iov_len = TEMP_BUFFER_SIZE;
+  iov[1].iov_base = tmp;
+  iov[1].iov_len = TEMP_BUFFER_SIZE;
   int n = static_cast<int>(readv(fd, iov, 2));
   if (n < 0) {
     return -1;
@@ -92,7 +88,6 @@ int Buffer::ReadSocket(int fd) {
     writeOffset_ = capacity_;
     Append(tmp, n - writeable);
   }
-  delete []tmp;
   return n;
 }
 
@@ -108,6 +103,11 @@ int Buffer::SendSocket(int socket) {
   }
   return 0;
 }
-void Buffer::ReadAll(char* dst, int size) {
-  memcpy(dst, data_ + readOffset_, size);
+int Buffer::Read(char* buf, int size) {
+  if (size > GetReadableSize()) {
+    return -1;
+  }
+  std::memmove(buf, data_ + readOffset_, size);
+  readOffset_ += size;
+  return 0;
 }

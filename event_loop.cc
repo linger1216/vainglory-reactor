@@ -20,7 +20,7 @@ EventLoop::EventLoop(const char* threadName)
       isRunning_(false),
       dispatcher_(new EpollDispatcher(this)) {
 
-  Debug("%s is create, addr:%p", threadName, this);
+  Debug("%s is create, [%p]", threadName, std::this_thread::get_id());
 
   fd2ChannelMap_.clear();
 
@@ -49,15 +49,15 @@ EventLoop::~EventLoop() {
 void EventLoop::Run() {
   assert(isRunning_ == false);
   isRunning_ = true;
-  Debug("EventLoop:%s is running", threadName_.c_str());
+  //  Debug("EventLoop:%s is running", threadName_.c_str());
   while (isRunning_) {
-    Debug("EventLoop:%s is dispatch", threadName_.c_str());
+    // Debug("EventLoop:%s is dispatch", threadName_.c_str());
     dispatcher_->Dispatch(TIMEOUT_MS);
 
     // 执行其他Loop派发过来需要处理的任务
     // main loop 注册一个cb, 需要sub loop来执行
     // 唤醒loop线程, 也就是Dispatch会唤醒，会自动进入到processTask的动作
-    Debug("EventLoop:%s is process task", threadName_.c_str());
+    // Debug("EventLoop:%s is process task", threadName_.c_str());
     processTask();
   }
   Debug("EventLoop %p quit looping", this);
@@ -79,6 +79,7 @@ void EventLoop::wakeupTaskRead() const {
   if (n != sizeof(one)) {
     Error("wakeupRead reads %ld bytes instead of 8", n);
   }
+  Debug("%s wakeupTask read signal [%p]", threadName_.c_str(), std::this_thread::get_id());
 }
 
 void EventLoop::wakeupTask() const {
@@ -87,7 +88,7 @@ void EventLoop::wakeupTask() const {
   if (n != sizeof(one)) {
     Error("wakeupTask writes %ld bytes instead of 8", n);
   }
-  Debug("wakeupTask writes signal");
+  Debug("%s wakeupTask writes signal [%p]", threadName_.c_str(), std::this_thread::get_id());
 }
 
 
@@ -114,7 +115,7 @@ void EventLoop::processTask() {
     }
     if (node == nullptr) continue;
 
-    Debug("processTask node channel:%d【%s】", node->channel->Fd(), EventLoopOperatorToString(node->op));
+    Debug("%s processTask channel:%d【%s】[%p]", threadName_.c_str(), node->channel->Fd(), EventLoopOperatorToString(node->op), std::this_thread::get_id());
     switch (node->op) {
       case EventLoopOperator::Add:
         handleAddOperatorTask(node->channel);
@@ -161,7 +162,7 @@ int EventLoop::AddTask(Channel* channel, EventLoopOperator type) {
   {
     std::lock_guard<std::mutex> locker(mutex_);
     auto node = new Node(channel, type);
-    Debug("addTask node channel:%d【%s】", channel->Fd(), EventLoopOperatorToString(type));
+    Debug("%s addTask channel:%d【%s】[%p]", threadName_.c_str(), channel->Fd(), EventLoopOperatorToString(type), std::this_thread::get_id());
     taskQueue_.push(node);
   }
   if (!IsInLoopThread()) {
@@ -184,4 +185,7 @@ int EventLoop::FreeChannel(Channel* channel) {
 }
 std::thread::id EventLoop::GetThreadId() const {
   return threadId_;
+}
+const char* EventLoop::Name() const {
+  return threadName_.c_str();
 }

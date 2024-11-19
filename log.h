@@ -78,7 +78,8 @@ template<typename... T>
 static inline void logy_body(const char* file, int line, const char* func, T... args) {
   {
     std::lock_guard<std::mutex> guard(g_logy_mutex);
-    std::fprintf(stderr, "[%s:%d] [%s] ", file, line, func);
+//    std::fprintf(stderr, "[%s:%d] [%s] ", file, line, func);
+    std::fprintf(stderr, "[%s:%d] ", file, line);
     std::fprintf(stderr, args...);
     std::fprintf(stderr, "\n");
     std::fflush(stderr);

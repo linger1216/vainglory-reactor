@@ -23,7 +23,6 @@ public:
   int Delete(Channel* channel) override;
   int Update(Channel* channel) override;
   int Dispatch( int timeoutMs) override;
-
 private:
   const int EPOLL_INIT_EVENTS = 128;
 private:

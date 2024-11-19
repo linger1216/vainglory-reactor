@@ -51,7 +51,7 @@ int EpollDispatcher::Dispatch(int timeoutMs) {
                          static_cast<int>(events_.size()),
                          timeoutMs);
   if (numEvents > 0) {
-    Debug("EventLoop %p wakeup with %d events handlers", loop_, numEvents);
+    Debug("%s epoll_wait with %d events handlers [%p]", loop_->Name(), numEvents, std::this_thread::get_id());
     // 我们的设计更好, 直接在这里调用cb，
     // muduo还要两次循环, 这里一次，event loop还有一次
     for (int i = 0; i < numEvents; i++) {
@@ -66,7 +66,7 @@ int EpollDispatcher::Dispatch(int timeoutMs) {
       events_.resize(events_.size() * 2);
     }
   } else if (numEvents == 0) {
-    Warn("epoll_wait timeout");
+//    Warn("epoll_wait timeout");
   } else {
     Warn("epoll_wait error");
   }

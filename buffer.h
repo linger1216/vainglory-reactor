@@ -24,9 +24,10 @@ public:
   int ReadSocket(int fd);
   int SendSocket(int socket);
 
-  void ReadAll(char* dst, int size);
+  int Read(char* buf, int size);
 
 private:
+  const int TEMP_BUFFER_SIZE = 40960;
   // 指向内存的指针
   char* data_;
   int capacity_;

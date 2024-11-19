@@ -24,7 +24,6 @@ ThreadPool::ThreadPool(EventLoop* mainEventLoop, int threadNum)
   for (int i = 0; i < threadNum_; ++i) {
     threads_.push_back(new WorkThread(i));
   }
-  Debug("ThreadPool is created %d thread", threadNum_);
 }
 
 void ThreadPool::Run() {
@@ -38,7 +37,7 @@ void ThreadPool::Run() {
 }
 
 EventLoop* ThreadPool::GetNextEventLoop() {
-  if (mainEventLoop_->IsInLoopThread()) {
+  if (!mainEventLoop_->IsInLoopThread()) {
     Error("main thread should call GetNextEventLoop");
   }
 

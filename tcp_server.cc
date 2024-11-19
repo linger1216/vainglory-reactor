@@ -36,7 +36,7 @@ TcpServer::TcpServer(unsigned short port, int threadNum,
   mainEventLoop_ = new EventLoop();
   threadPool_ = new ThreadPool(mainEventLoop_, threadNum);
   listen();
-  Debug("Server %s is created", netAddress_->IpPort().c_str());
+  Debug("Server %s is created [%p]", netAddress_->IpPort().c_str(), std::this_thread::get_id());
 }
 
 
@@ -69,15 +69,16 @@ int TcpServer::acceptConnection() {
   INetAddress peerAddr(0);
   int clientFd = SocketHelper::Accept(fd_, peerAddr.GetSockAddr());
   auto peer = SocketHelper::to_sockaddr_in(peerAddr.GetSockAddr());
-  Debug("accept client %s:%d\n", inet_ntoa(peer->sin_addr),
-        ntohs(peer->sin_port));
+  Debug("有个新的客户端 %s:%d [%p]", inet_ntoa(peer->sin_addr), ntohs(peer->sin_port), std::this_thread::get_id());
 
   INetAddress localAddr(SocketHelper::GetLocalAddr(clientFd));
 
+  Debug("准备新建一个TCP连接 [%p]", std::this_thread::get_id());
   // TODO：
   // 得到了client id后，不能在主线程中去处理通信的相关流程了
   // 需要从线程池得到一个合适的工作线程， 委托他使用Tcp Connection来通信相关处理
   EventLoop* ioLoop = threadPool_->GetNextEventLoop();
+  Debug("从线程池取一个IO事件循环, 因为运行在线程池的, 所以一定是非主线程 [%p]", std::this_thread::get_id());
 
   // TODO:
   // 新建的tcpConnection资源什么时候释放？
@@ -100,17 +101,17 @@ void TcpServer::listen() {
   SocketHelper::SetReusePort(fd_, true);
   SocketHelper::Bind(fd_, netAddress_->GetSockAddr());
   SocketHelper::Listen(fd_);
-  Debug("listen on %s", netAddress_->IpPort().c_str());
+  Debug("listen on %s [%p]", netAddress_->IpPort().c_str(), std::this_thread::get_id());
 
   // 后面还差一个accept, 其实就是委托channel来实现
 }
 void TcpServer::defaultConnectionCallback(const TcpConnection* conn) {
 }
 void TcpServer::defaultMessageCallback(const TcpConnection* conn, Buffer* buffer, int n) {
-  char* data = new char[n];
-  buffer->ReadAll(data, n);
-  Debug("defaultMessage receive data %s", data);
-  delete []data;
+  char* msg = new char[n];
+  buffer->Read(msg, n);
+  Debug("recv msg:%s", msg);
+  delete []msg;
 }
 void TcpServer::removeConnection(const TcpConnection* conn) {
 }

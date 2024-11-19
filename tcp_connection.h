@@ -11,13 +11,21 @@
 #include "no_copyable.h"
 #include "time_stamp.h"
 #include <string>
+#include <atomic>
 
 class EventLoop;
 class Channel;
 class Buffer;
 
-class TcpConnection : public NoCopyable{
+class TcpConnection : public NoCopyable {
 public:
+  enum class Status {
+    Disconnected = 0x00,
+    Connected = 0x01,
+    Disconnecting = 0x01 << 1,
+    Connecting = 0x01 << 2,
+  };
+
   ~TcpConnection();
   explicit TcpConnection(int fd, EventLoop* eventLoop,
                          const INetAddress& localAddr,
@@ -34,12 +42,14 @@ private:
   int errorHandler(void* arg);
 
 private:
+
   const int BUFFER_SIZE = 10240;
   std::string name_;
   EventLoop* eventLoop_;
   Channel* channel_;
   Buffer* readBuf_;
   Buffer* writeBuf_;
+  std::atomic_int  status_;
 
   INetAddress localAddr_;
   INetAddress peerAddr_;
@@ -51,4 +61,4 @@ private:
 };
 
 
-#endif//REACTOR_CPP_TCP_CONNECTION_H
+#endif //REACTOR_CPP_TCP_CONNECTION_H

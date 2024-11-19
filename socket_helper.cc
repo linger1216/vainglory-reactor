@@ -119,9 +119,9 @@ int SocketHelper::ShutdownWrite(int socketFd) {
 void SocketHelper::ToIpPort(char* buf, size_t size, const struct sockaddr* addr) {
   ToIp(buf, size, addr);
   size_t end = ::strlen(buf);
+  buf[end++] = ':';
   const struct sockaddr_in* addr4 = to_sockaddr_in(addr);
   uint16_t port = networkToHost16(addr4->sin_port);
-  assert(size > end);
   snprintf(buf + end, size - end, "%u", port);
 }
 

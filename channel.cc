@@ -13,7 +13,7 @@ Channel::Channel(int fd, FDEvent events,
                  void* arg)
     : fd_(fd), events_(static_cast<int>(events)),
       tied_(false),
-      arg_(nullptr),
+      arg_(arg),
       readCallback_(std::move(readCallback)),
       writeCallback_(std::move(writeCallback)),
       closeCallback_(std::move(closeCallback)),
@@ -84,19 +84,19 @@ void Channel::ExecCallback(void* arg, FDEvent event) {
 // 这个事件是转义的,需要在poller那里做好适配
 void Channel::execCallbackWithGuard(void* arg, FDEvent event) {
   if ((event == FDEvent::ReadEvent) && readCallback_) {
-    Debug("Fd = %d Events = %d handle read event", fd_, event);
+    Debug("Fd = %d Events = %d handle read event [%p]", fd_, event, std::this_thread::get_id());
     readCallback_(arg);
   }
   if ((event == FDEvent::WriteEvent) && writeCallback_) {
-    Debug("Fd = %d Events = %d handle write event", fd_, event);
+    Debug("Fd = %d Events = %d handle write event [%p]", fd_, event, std::this_thread::get_id());
     writeCallback_(arg);
   }
   if ((event == FDEvent::ErrorEvent) && errorCallback_) {
-    Debug("Fd = %d Events = %d handle error event", fd_, event);
+    Debug("Fd = %d Events = %d handle error event [%p]", fd_, event, std::this_thread::get_id());
     errorCallback_(arg);
   }
   if ((event == FDEvent::CloseEvent) && closeCallback_) {
-    Debug("Fd = %d Events = %d handle close event", fd_, event);
+    Debug("Fd = %d Events = %d handle close event [%p]", fd_, event, std::this_thread::get_id());
     closeCallback_(arg);
   }
 }

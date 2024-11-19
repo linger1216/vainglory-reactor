@@ -19,6 +19,7 @@ TcpConnection::TcpConnection(int fd, EventLoop* eventLoop,
                              MessageCallback messageCallback,
                              WriteCompleteCallback writeCompleteCallback)
     : eventLoop_(eventLoop),
+      status_(static_cast<int>(Status::Disconnected)),
       localAddr_(localAddr),
       peerAddr_(peerAddr),
       connectionCallback_(std::move(connectionCallback)),
@@ -27,6 +28,7 @@ TcpConnection::TcpConnection(int fd, EventLoop* eventLoop,
       writeCompleteCallback_(std::move(writeCompleteCallback)) {
 
   name_ = "TcpConnection-" + std::to_string(fd);
+  Debug("创建TCP连接, connName: %s [%p]", name_.c_str(), std::this_thread::get_id());
   readBuf_ = new Buffer(BUFFER_SIZE);
   writeBuf_ = new Buffer(BUFFER_SIZE);
 

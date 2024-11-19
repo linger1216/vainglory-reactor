@@ -75,6 +75,9 @@ public:
 
   // 删除channel对象
   int FreeChannel(Channel* channel);
+
+  // 返回当前loop的名字
+  const char* Name() const;
 private:
   const int TIMEOUT_MS = 10000;
   struct Node {
