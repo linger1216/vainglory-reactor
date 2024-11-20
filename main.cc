@@ -15,6 +15,7 @@ void messageCallback(const TcpConnection* conn, Buffer* buffer, int n){
   Debug("recv msg:%s", msg);
   delete []msg;
 
+  // why peer cannot receive the message
   buffer->Append("hello");
 }
 
