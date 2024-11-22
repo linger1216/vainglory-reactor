@@ -12,15 +12,17 @@
 #include <cassert>
 #include <unistd.h>
 #include <utility>
+#include "inet_address.h"
 
-TcpConnection::TcpConnection(int fd, EventLoop* eventLoop,
+TcpConnection::TcpConnection(const char* name, int fd, EventLoop* eventLoop,
                              const INetAddress& localAddr,
                              const INetAddress& peerAddr,
                              ConnectionCallback connectionCallback,
                              CloseCallback closeCallback,
                              MessageCallback messageCallback,
                              WriteCompleteCallback writeCompleteCallback)
-    : eventLoop_(eventLoop),
+    : name_(name),
+      loop_(eventLoop),
       status_(static_cast<int>(Status::Disconnected)),
       localAddr_(localAddr),
       peerAddr_(peerAddr),
@@ -48,11 +50,11 @@ TcpConnection::TcpConnection(int fd, EventLoop* eventLoop,
                          closeHandler,
                          errorHandler,
                          this);
-  eventLoop_->AddChannelEventInLoop(channel_);
+  loop_->AddChannelEventInLoop(channel_);
 }
 
 TcpConnection::~TcpConnection() {
-  eventLoop_->DestroyChannel(channel_);
+  loop_->DestroyChannel(channel_);
   delete channel_;
   delete readBuf_;
   delete writeBuf_;
@@ -68,8 +70,8 @@ int TcpConnection::readHandler(void* arg) {
   } else if (count == 0) {
     // 没有读到数据，关闭连接
     Debug("client down, so we close connection");
-//    conn->eventLoop_->AddTask(conn->channel_, EventLoopOperator::Delete);
-    conn->eventLoop_->DeleteChannelEventInLoop(conn->channel_);
+//    conn->loop_->AddTask(conn->channel_, EventLoopOperator::Delete);
+    conn->loop_->DeleteChannelEventInLoop(conn->channel_);
   } else {
     Error("read error, error code: %d\n", SocketHelper::GetSocketError(conn->channel_->Fd()));
   }
@@ -77,7 +79,7 @@ int TcpConnection::readHandler(void* arg) {
 }
 
 int TcpConnection::writeHandler(void* arg) {
-  assert(eventLoop_->IsInLoopThread());
+  assert(loop_->IsInLoopThread());
   auto conn = static_cast<TcpConnection*>(arg);
   // 判断是否有写事件
   if (channel_->IsWriting()) {
@@ -90,8 +92,8 @@ int TcpConnection::writeHandler(void* arg) {
         // 1. 不在检测写事件
         conn->channel_->DisableWriting();
         // 2. 修改dispathcer检测的集合 -- 添加节点
-//        conn->eventLoop_->AddTask(conn->channel_, EventLoopOperator::Update);
-        conn->eventLoop_->UpdateChannelEventInLoop(conn->channel_);
+//        conn->loop_->AddTask(conn->channel_, EventLoopOperator::Update);
+        conn->loop_->UpdateChannelEventInLoop(conn->channel_);
         if (writeCompleteCallback_ != nullptr) {
           writeCompleteCallback_(conn);
         }
@@ -99,8 +101,8 @@ int TcpConnection::writeHandler(void* arg) {
     } else {
       // 没有写到数据，关闭连接
       Debug("write 0 bytes, means connection is down, so we close connection");
-//      conn->eventLoop_->AddTask(conn->channel_, EventLoopOperator::Delete);
-      conn->eventLoop_->UpdateChannelEventInLoop(conn->channel_);
+//      conn->loop_->AddTask(conn->channel_, EventLoopOperator::Delete);
+      conn->loop_->UpdateChannelEventInLoop(conn->channel_);
     }
   }
   return 0;
@@ -114,7 +116,7 @@ int TcpConnection::errorHandler(void* arg) {
 }
 
 int TcpConnection::closeHandler(void* arg) {
-  assert(eventLoop_->IsInLoopThread());
+  assert(loop_->IsInLoopThread());
   auto conn = static_cast<TcpConnection*>(arg);
   Debug("closeHandler arg:%p, 准备删除此连接", arg);
   delete conn;
@@ -223,4 +225,25 @@ void TcpConnection::Send(const char* data, size_t len) {
       channel_->EnableWriting();
     }
   }
+}
+const char* TcpConnection::Name() {
+  return name_.c_str();
+}
+const char* TcpConnection::PeerIpPort() {
+  return peerAddr_.IpPort().c_str();
+}
+EventLoop* TcpConnection::Loop() {
+  return loop_;
+}
+
+int TcpConnection::Close() {
+  loop_->AssertInLoop();
+  if (status_ == static_cast<int>(Status::Connected)) {
+    channel_->DisableAll();
+    if (connectionCallback_) {
+      connectionCallback_(this);
+    }
+    status_ = static_cast<int>(Status::Disconnected);
+  }
+  return 0;
 }

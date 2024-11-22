@@ -10,8 +10,8 @@
 #include "inet_address.h"
 #include "no_copyable.h"
 #include "time_stamp.h"
-#include <string>
 #include <atomic>
+#include <string>
 
 class EventLoop;
 class Channel;
@@ -27,7 +27,7 @@ public:
   };
 
   ~TcpConnection();
-  explicit TcpConnection(int fd, EventLoop* eventLoop,
+  explicit TcpConnection(const char* name, int fd, EventLoop* eventLoop,
                          const INetAddress& localAddr,
                          const INetAddress& peerAddr,
                          ConnectionCallback connectionCallback,
@@ -36,17 +36,19 @@ public:
                          WriteCompleteCallback writeCompleteCallback);
 
   void Send(const char* data, size_t len);
+  EventLoop* Loop();
+  const char* Name();
+  const char* PeerIpPort();
+  int Close();
 private:
   int readHandler(void* arg);
   int writeHandler(void* arg);
   int closeHandler(void* arg);
   int errorHandler(void* arg);
-
 private:
-
   const int BUFFER_SIZE = 10240;
   std::string name_;
-  EventLoop* eventLoop_;
+  EventLoop* loop_;
   Channel* channel_;
   Buffer* readBuf_;
   Buffer* writeBuf_;

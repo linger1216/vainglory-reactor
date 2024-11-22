@@ -3,6 +3,7 @@
 //
 
 #include "tcp_server.h"
+#include "acceptor.h"
 #include "buffer.h"
 #include "channel.h"
 #include "event_loop.h"
@@ -13,9 +14,9 @@
 #include "tcp_connection.h"
 #include "thread_pool.h"
 #include <arpa/inet.h>
+#include <cassert>
 #include <unistd.h>
 #include <utility>
-#include "acceptor.h"
 
 TcpServer::TcpServer(unsigned short port, int threadNum,
                      ConnectionCallback connectionCallback,
@@ -33,12 +34,13 @@ TcpServer::TcpServer(unsigned short port, int threadNum,
 
   // 创建监听器
   acceptor_ = new Acceptor(mainEventLoop_,
-                       netAddress_,
-                       std::bind(&TcpServer::connectedCallback, this, std::placeholders::_1, std::placeholders::_2));
+                           netAddress_,
+                           std::bind(&TcpServer::connectedCallback,
+                                     this, std::placeholders::_1,
+                                     std::placeholders::_2));
 
   // 创建线程池
   threadPool_ = new ThreadPool(mainEventLoop_, threadNum);
-
 
   if (connectionCallback_ == nullptr) {
     connectionCallback_ = std::bind(&TcpServer::defaultConnectionCallback, this, std::placeholders::_1);
@@ -46,9 +48,6 @@ TcpServer::TcpServer(unsigned short port, int threadNum,
   if (messageCallback_ == nullptr) {
     messageCallback_ = std::bind(&TcpServer::defaultMessageCallback, this, std::placeholders::_1, std::placeholders::_2, std::placeholders::_3);
   }
-
-
-  Debug("Server %s is created", netAddress_->IpPort().c_str());
 }
 
 
@@ -62,71 +61,62 @@ TcpServer::~TcpServer() {
 
 
 int TcpServer::Run() {
+
   // 线程池启动
   threadPool_->Run();
 
   // 开始监听 acceptor listen 内部封装了loop queue,
   // 不用直接用run in loop
   acceptor_->Listen();
+  Debug("listen on %s", netAddress_->IpPort().c_str());
 
   // 主线程循环启动
   Debug("Server %s is running", netAddress_->IpPort().c_str());
   mainEventLoop_->Run();
-
   Debug("Server %s is down", netAddress_->IpPort().c_str());
   return 0;
 }
 
-int TcpServer::acceptConnection() {
-
-  INetAddress peerAddr(0);
-  int clientFd = SocketHelper::Accept(fd_, peerAddr.GetSockAddr());
-  auto peer = SocketHelper::to_sockaddr_in(peerAddr.GetSockAddr());
-  Debug("有个新的客户端 %s:%d", inet_ntoa(peer->sin_addr), ntohs(peer->sin_port));
-
-  INetAddress localAddr(SocketHelper::GetLocalAddr(clientFd));
-
-  Debug("准备新建一个TCP连接");
-  // TODO：
-  // 得到了client id后，不能在主线程中去处理通信的相关流程了
-  // 需要从线程池得到一个合适的工作线程， 委托他使用Tcp Connection来通信相关处理
-  EventLoop* ioLoop = threadPool_->GetNextEventLoop();
-  Debug("从线程池取一个IO事件循环, 因为运行在线程池的, 所以一定是非主线程");
-
-  // TODO:
-  // 新建的tcpConnection资源什么时候释放？
-  auto conn = new TcpConnection(clientFd,
-                                ioLoop,
-                                localAddr,
-                                peerAddr,
-                                connectionCallback_,
-                                std::bind(&TcpServer::removeConnection, this, std::placeholders::_1),
-                                messageCallback_,
-                                writeCompleteCallback_);
-  connections_["TcpConnection-" + std::to_string(clientFd)] = conn;
-  return 0;
-}
-
-
-void TcpServer::listen() {
-  fd_ = SocketHelper::CreateSocket(AF_INET);
-  SocketHelper::SetReuseAddr(fd_, true);
-  SocketHelper::SetReusePort(fd_, true);
-  SocketHelper::Bind(fd_, netAddress_->GetSockAddr());
-  SocketHelper::Listen(fd_);
-  Debug("listen on %s", netAddress_->IpPort().c_str());
-
-  // 后面还差一个accept, 其实就是委托channel来实现
-}
 void TcpServer::defaultConnectionCallback(const TcpConnection* conn) {
 }
 void TcpServer::defaultMessageCallback(const TcpConnection* conn, Buffer* buffer, int n) {
-  char* msg = new char[n];
-  buffer->Read(msg, n);
-  Debug("recv msg:%s", msg);
-  delete[] msg;
 }
+
 void TcpServer::removeConnection(const TcpConnection* conn) {
+  mainEventLoop_->AssertInLoop();
+  // 主线程需要将他自己拥有的资源移除
+  // 主要就是链表删除这个连接引用, 其他没什么吊事.
+  // 删除资源不在这.
+  auto c = const_cast<TcpConnection*>(conn);
+  Debug("释放新连接 from %s", c->PeerIpPort());
+  auto n = connections_.erase(c->Name());
+  assert(n == 1);
+
+  // 关闭资源在io线程中做, 因为这个连接的资源是io线程拥有的
+  auto ioLoop = c->Loop();
+  ioLoop->RunInLoop(std::bind(&TcpConnection::Close, c));
 }
-void TcpServer::connectedCallback(int fd, const INetAddress* addr) {
+
+// 代表一个新链接建立完毕, 后面的工作是将这个连接的数据接收
+// 放在一个线程中进行处理
+// 得到了client id后，不能在主线程中去处理通信的相关流程了
+// 需要从线程池得到一个合适的工作线程， 委托他使用Tcp Connection来通信相关处理
+void TcpServer::connectedCallback(int clientFd, const INetAddress& peerAddr) {
+
+  INetAddress localAddr(SocketHelper::GetLocalAddr(clientFd));
+
+  Debug("收到新连接 from %s", peerAddr.IpPort().c_str());
+  EventLoop* ioLoop = threadPool_->GetNextEventLoop();
+  Debug("从线程池取一个IO事件循环, 因为运行在线程池的, 所以一定是非主线程");
+  // TODO:
+  // 新建的tcpConnection资源什么时候释放？
+  auto name = "TcpConnection-" + std::to_string(clientFd);
+  auto conn = new TcpConnection(name.c_str(), clientFd, ioLoop,
+                                localAddr, peerAddr,
+                                connectionCallback_,
+                                std::bind(&TcpServer::removeConnection,
+                                          this, std::placeholders::_1),
+                                messageCallback_,
+                                writeCompleteCallback_);
+  connections_[name] = conn;
 }

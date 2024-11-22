@@ -27,7 +27,7 @@ public:
 private:
   void listen();
   int acceptConnection();
-  void connectedCallback(int fd, const INetAddress* addr);
+  void connectedCallback(int clientFd, const INetAddress& peerAddr);
   void removeConnection(const TcpConnection* conn);
   void defaultConnectionCallback(const TcpConnection* conn);
   void defaultMessageCallback(const TcpConnection* conn, Buffer*, int n);
