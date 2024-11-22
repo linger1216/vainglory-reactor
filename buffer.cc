@@ -9,7 +9,7 @@
 #include <cstring>
 #include <sys/socket.h>
 #include <sys/uio.h>
-
+#include <cerrno>
 Buffer::~Buffer() {
   delete [] data_;
 }
@@ -68,19 +68,25 @@ int Buffer::Append(const char* buf) {
   return Append(buf, static_cast<int>(strlen(buf)));
 }
 
-int Buffer::ReadSocket(int fd) {
+int Buffer::ReadSocket(int fd, int* reason) {
   int writeable = GetWriteableSize();
 
   iovec iov[2];
   iov[0].iov_base = data_ + writeOffset_;
   iov[0].iov_len = writeable;
 
-  char tmp[TEMP_BUFFER_SIZE];
-  std::memset(tmp, 0, TEMP_BUFFER_SIZE);
+  // 这里是尽量把所有数据一次性读取出来, 有如下原因:
+  // 1. Epoll是边缘触发, 一次读不完, 后面的下一次回调不知道什么时候会来.
+  // 2.
+  // tcp buffer 如果确实要设置大的缓存区
+  // 需要调整系统参数
+  char tmp[TCP_BUFFER_SIZE];
+  std::memset(tmp, 0, TCP_BUFFER_SIZE);
   iov[1].iov_base = tmp;
-  iov[1].iov_len = TEMP_BUFFER_SIZE;
+  iov[1].iov_len = TCP_BUFFER_SIZE;
   int n = static_cast<int>(readv(fd, iov, 2));
   if (n < 0) {
+    *reason = errno;
     return -1;
   } else if (n <= writeable) {
     writeOffset_ += n;

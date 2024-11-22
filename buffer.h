@@ -21,13 +21,13 @@ public:
   int Append(const char* buf);
   int Append(const char* buf, int size);
 
-  int ReadSocket(int fd);
+  int ReadSocket(int fd, int* reason);
   int SendSocket(int socket);
 
   int Read(char* buf, int size);
 
 private:
-  const int TEMP_BUFFER_SIZE = 40960;
+  const int TCP_BUFFER_SIZE = 64 * 1024;
   // 指向内存的指针
   char* data_;
   int capacity_;

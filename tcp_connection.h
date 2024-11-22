@@ -35,6 +35,7 @@ public:
                          MessageCallback messageCallback,
                          WriteCompleteCallback writeCompleteCallback);
 
+  void Send(const char* data, size_t len);
 private:
   int readHandler(void* arg);
   int writeHandler(void* arg);
@@ -57,6 +58,8 @@ private:
   MessageCallback messageCallback_;
   CloseCallback closeCallback_;
   WriteCompleteCallback writeCompleteCallback_;
+
+  size_t highWaterMark_;
   HighWaterMarkCallback highWaterMarkCallback_;
 };
 

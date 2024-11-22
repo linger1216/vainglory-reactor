@@ -52,7 +52,7 @@ class IDispatcher;
 
 class EventLoop : public NoCopyable {
 public:
-  using Functor = std::function<void()>;
+  using Functor = std::function<int(void*)>;
 public:
   EventLoop();
   explicit EventLoop(const char* threadName);
