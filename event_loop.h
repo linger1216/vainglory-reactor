@@ -82,11 +82,12 @@ public:
 
   int RunInLoop(Functor fn);
   int QueueInLoop(Functor fn);
+  void AssertInLoop();
 
     // 添加channel的监听
-  int AddChannelReadEventInLoop(Channel* channel);
-  int UpdateChannelReadEventInLoop(Channel* channel);
-  int DeleteChannelReadEventInLoop(Channel* channel);
+  int AddChannelEventInLoop(Channel* channel);
+  int UpdateChannelEventInLoop(Channel* channel);
+  int DeleteChannelEventInLoop(Channel* channel);
 
 private:
   const int TIMEOUT_MS = 10000;
@@ -97,9 +98,9 @@ private:
 //  };
 
 private:
-  int addChannelReadEvent(Channel* channel);
-  int updateChannelReadEvent(Channel* channel);
-  int deleteChannelReadEvent(Channel* channel);
+  int addChannelEvent(Channel* channel);
+  int updateChannelEvent(Channel* channel);
+  int deleteChannelEvent(Channel* channel);
 
   // 线程被唤醒后的读回调 （将唤醒发送的数据，读出来，清空读缓存区）
   void wakeupTaskRead() const;

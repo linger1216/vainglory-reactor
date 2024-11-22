@@ -48,7 +48,7 @@ TcpConnection::TcpConnection(int fd, EventLoop* eventLoop,
                          closeHandler,
                          errorHandler,
                          this);
-  eventLoop_->AddChannelReadEventInLoop(channel_);
+  eventLoop_->AddChannelEventInLoop(channel_);
 }
 
 TcpConnection::~TcpConnection() {
@@ -69,7 +69,7 @@ int TcpConnection::readHandler(void* arg) {
     // 没有读到数据，关闭连接
     Debug("client down, so we close connection");
 //    conn->eventLoop_->AddTask(conn->channel_, EventLoopOperator::Delete);
-    conn->eventLoop_->DeleteChannelReadEventInLoop(conn->channel_);
+    conn->eventLoop_->DeleteChannelEventInLoop(conn->channel_);
   } else {
     Error("read error, error code: %d\n", SocketHelper::GetSocketError(conn->channel_->Fd()));
   }
@@ -91,7 +91,7 @@ int TcpConnection::writeHandler(void* arg) {
         conn->channel_->DisableWriting();
         // 2. 修改dispathcer检测的集合 -- 添加节点
 //        conn->eventLoop_->AddTask(conn->channel_, EventLoopOperator::Update);
-        conn->eventLoop_->UpdateChannelReadEventInLoop(conn->channel_);
+        conn->eventLoop_->UpdateChannelEventInLoop(conn->channel_);
         if (writeCompleteCallback_ != nullptr) {
           writeCompleteCallback_(conn);
         }
@@ -100,7 +100,7 @@ int TcpConnection::writeHandler(void* arg) {
       // 没有写到数据，关闭连接
       Debug("write 0 bytes, means connection is down, so we close connection");
 //      conn->eventLoop_->AddTask(conn->channel_, EventLoopOperator::Delete);
-      conn->eventLoop_->UpdateChannelReadEventInLoop(conn->channel_);
+      conn->eventLoop_->UpdateChannelEventInLoop(conn->channel_);
     }
   }
   return 0;

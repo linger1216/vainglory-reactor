@@ -3,28 +3,42 @@
 //
 
 #include "tcp_server.h"
+#include "buffer.h"
 #include "channel.h"
 #include "event_loop.h"
 #include "fd_event.h"
 #include "inet_address.h"
+#include "log.h"
+#include "socket_helper.h"
 #include "tcp_connection.h"
 #include "thread_pool.h"
 #include <arpa/inet.h>
 #include <unistd.h>
 #include <utility>
-#include "buffer.h"
-#include "log.h"
-#include "socket_helper.h"
+#include "acceptor.h"
 
 TcpServer::TcpServer(unsigned short port, int threadNum,
                      ConnectionCallback connectionCallback,
                      MessageCallback messageCallback,
                      WriteCompleteCallback writeCompleteCallback)
     : fd_(-1),
+      acceptor_(nullptr),
       netAddress_(new INetAddress(port)),
       connectionCallback_(std::move(connectionCallback)),
       messageCallback_(std::move(messageCallback)),
       writeCompleteCallback_(std::move(writeCompleteCallback)) {
+
+  // 初始化主线程
+  mainEventLoop_ = new EventLoop();
+
+  // 创建监听器
+  acceptor_ = new Acceptor(mainEventLoop_,
+                       netAddress_,
+                       std::bind(&TcpServer::connectedCallback, this, std::placeholders::_1, std::placeholders::_2));
+
+  // 创建线程池
+  threadPool_ = new ThreadPool(mainEventLoop_, threadNum);
+
 
   if (connectionCallback_ == nullptr) {
     connectionCallback_ = std::bind(&TcpServer::defaultConnectionCallback, this, std::placeholders::_1);
@@ -33,9 +47,7 @@ TcpServer::TcpServer(unsigned short port, int threadNum,
     messageCallback_ = std::bind(&TcpServer::defaultMessageCallback, this, std::placeholders::_1, std::placeholders::_2, std::placeholders::_3);
   }
 
-  mainEventLoop_ = new EventLoop();
-  threadPool_ = new ThreadPool(mainEventLoop_, threadNum);
-  listen();
+
   Debug("Server %s is created", netAddress_->IpPort().c_str());
 }
 
@@ -50,17 +62,18 @@ TcpServer::~TcpServer() {
 
 
 int TcpServer::Run() {
+  // 线程池启动
   threadPool_->Run();
-  auto listenerChannel = new Channel(fd_,
-                                     FDEvent::ReadEvent,
-                                     std::bind(&TcpServer::acceptConnection, this),
-                                     nullptr,
-                                     nullptr,
-                                     nullptr,
-                                     this);
-  mainEventLoop_->AddChannelReadEventInLoop(listenerChannel);
-  mainEventLoop_->Run();
+
+  // 开始监听 acceptor listen 内部封装了loop queue,
+  // 不用直接用run in loop
+  acceptor_->Listen();
+
+  // 主线程循环启动
   Debug("Server %s is running", netAddress_->IpPort().c_str());
+  mainEventLoop_->Run();
+
+  Debug("Server %s is down", netAddress_->IpPort().c_str());
   return 0;
 }
 
@@ -111,7 +124,9 @@ void TcpServer::defaultMessageCallback(const TcpConnection* conn, Buffer* buffer
   char* msg = new char[n];
   buffer->Read(msg, n);
   Debug("recv msg:%s", msg);
-  delete []msg;
+  delete[] msg;
 }
 void TcpServer::removeConnection(const TcpConnection* conn) {
+}
+void TcpServer::connectedCallback(int fd, const INetAddress* addr) {
 }

@@ -36,7 +36,7 @@ EventLoop::EventLoop(const char* threadName)
                                nullptr,
                                nullptr, nullptr, this);
 
-  AddChannelReadEventInLoop(wakeupChannel_);
+  AddChannelEventInLoop(wakeupChannel_);
 }
 
 EventLoop::~EventLoop() {
@@ -163,10 +163,12 @@ int EventLoop::RunInLoop(EventLoop::Functor fn) {
 }
 
 int EventLoop::QueueInLoop(EventLoop::Functor fn) {
+
   {
     std::lock_guard<std::mutex> locker(mutex_);
     functors_.push_back(fn);
   }
+  Debug("Queue has %d functors", functors_.size());
   if (!IsInLoopThread()) {
     wakeupTask();
   } else {
@@ -175,22 +177,25 @@ int EventLoop::QueueInLoop(EventLoop::Functor fn) {
   return 0;
 }
 
-int EventLoop::AddChannelReadEventInLoop(Channel* channel) {
-  return RunInLoop(std::bind(&EventLoop::addChannelReadEvent, this, channel));
+int EventLoop::AddChannelEventInLoop(Channel* channel) {
+  return RunInLoop(std::bind(&EventLoop::addChannelEvent, this, channel));
 }
-int EventLoop::UpdateChannelReadEventInLoop(Channel* channel) {
-  return RunInLoop(std::bind(&EventLoop::updateChannelReadEvent, this, channel));
+int EventLoop::UpdateChannelEventInLoop(Channel* channel) {
+  return RunInLoop(std::bind(&EventLoop::updateChannelEvent, this, channel));
 }
-int EventLoop::DeleteChannelReadEventInLoop(Channel* channel) {
-  return RunInLoop(std::bind(&EventLoop::deleteChannelReadEvent, this, channel));
+int EventLoop::DeleteChannelEventInLoop(Channel* channel) {
+  return RunInLoop(std::bind(&EventLoop::deleteChannelEvent, this, channel));
 }
 
-int EventLoop::addChannelReadEvent(Channel* channel) {
+int EventLoop::addChannelEvent(Channel* channel) {
   return dispatcher_->Add(channel);
 }
-int EventLoop::updateChannelReadEvent(Channel* channel) {
+int EventLoop::updateChannelEvent(Channel* channel) {
   return dispatcher_->Update(channel);
 }
-int EventLoop::deleteChannelReadEvent(Channel* channel) {
+int EventLoop::deleteChannelEvent(Channel* channel) {
   return dispatcher_->Delete(channel);
+}
+void EventLoop::AssertInLoop() {
+  assert(IsInLoopThread());
 }

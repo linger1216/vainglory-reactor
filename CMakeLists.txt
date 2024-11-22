@@ -38,4 +38,6 @@ add_executable(vainglory_reactor main.cc
         socket_helper.cc
         socket_helper.h
         network_encode.h
+        acceptor.cc
+        acceptor.h
 )

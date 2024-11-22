@@ -9,7 +9,8 @@
 class TcpConnection;
 class Buffer;
 class INetAddress;
-using NewConnectionCallback =  std::function<void(int socketFd, const INetAddress*)>;
+
+using ConnectedCallback =  std::function<void(int fd, const INetAddress*)>;
 using ConnectionCallback = std::function<void (const TcpConnection* conn)>;
 using MessageCallback = std::function<void (const TcpConnection* conn, Buffer*, int n)>;
 using WriteCompleteCallback = std::function<void (const TcpConnection* conn)>;

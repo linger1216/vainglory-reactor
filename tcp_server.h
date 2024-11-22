@@ -13,6 +13,8 @@
 class EventLoop;
 class ThreadPool;
 class INetAddress;
+class Acceptor;
+
 class TcpServer : public NoCopyable{
 public:
   ~TcpServer();
@@ -25,18 +27,19 @@ public:
 private:
   void listen();
   int acceptConnection();
+  void connectedCallback(int fd, const INetAddress* addr);
   void removeConnection(const TcpConnection* conn);
   void defaultConnectionCallback(const TcpConnection* conn);
   void defaultMessageCallback(const TcpConnection* conn, Buffer*, int n);
 private:
-  EventLoop* mainEventLoop_;
-  ThreadPool* threadPool_;
   int fd_;
   INetAddress* netAddress_;
+  EventLoop* mainEventLoop_;
+  ThreadPool* threadPool_;
+  Acceptor* acceptor_;
   ConnectionCallback connectionCallback_;
   MessageCallback messageCallback_;
   WriteCompleteCallback writeCompleteCallback_;
-
   std::map<std::string, TcpConnection*> connections_;
 };
 
