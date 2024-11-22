@@ -26,25 +26,25 @@
  */
 
 
-enum class EventLoopOperator:char {
-  Add = 0,
-  Update = 1,
-  Delete = 2,
-};
+//enum class EventLoopOperator:char {
+//  Add = 0,
+//  Update = 1,
+//  Delete = 2,
+//};
 
 
-inline const char* EventLoopOperatorToString(EventLoopOperator event) {
-  switch (event) {
-    case EventLoopOperator::Add:
-      return "Add";
-    case EventLoopOperator::Update:
-      return "Update";
-    case EventLoopOperator::Delete:
-      return "Delete";
-    default:
-      return "Unknown";
-  }
-}
+//inline const char* EventLoopOperatorToString(EventLoopOperator event) {
+//  switch (event) {
+//    case EventLoopOperator::Add:
+//      return "Add";
+//    case EventLoopOperator::Update:
+//      return "Update";
+//    case EventLoopOperator::Delete:
+//      return "Delete";
+//    default:
+//      return "Unknown";
+//  }
+//}
 
 
 class Channel;
@@ -52,7 +52,7 @@ class IDispatcher;
 
 class EventLoop : public NoCopyable {
 public:
-  using Functor = std::function<int(void*)>;
+  using Functor = std::function<int()>;
 public:
   EventLoop();
   explicit EventLoop(const char* threadName);
@@ -72,22 +72,35 @@ public:
   void ExecChannelCallback(int fd, FDEvent event);
 
   // 添加任务到任务队列
-  int AddTask(Channel* channel, EventLoopOperator type);
+//  int AddTask(Channel* channel, EventLoopOperator type);
 
   // 删除channel对象
   int DestroyChannel(Channel* channel);
 
   // 返回当前loop的名字
   const char* Name() const;
-private:
-  const int TIMEOUT_MS = 10000;
-  struct Node {
-    Node(Channel* channel, EventLoopOperator op) : op(op), channel(channel) {}
-    EventLoopOperator op;
-    Channel* channel;
-  };
+
+  int RunInLoop(Functor fn);
+  int QueueInLoop(Functor fn);
+
+    // 添加channel的监听
+  int AddChannelReadEventInLoop(Channel* channel);
+  int UpdateChannelReadEventInLoop(Channel* channel);
+  int DeleteChannelReadEventInLoop(Channel* channel);
 
 private:
+  const int TIMEOUT_MS = 10000;
+//  struct Node {
+//    Node(Channel* channel, EventLoopOperator op) : op(op), channel(channel) {}
+//    EventLoopOperator op;
+//    Channel* channel;
+//  };
+
+private:
+  int addChannelReadEvent(Channel* channel);
+  int updateChannelReadEvent(Channel* channel);
+  int deleteChannelReadEvent(Channel* channel);
+
   // 线程被唤醒后的读回调 （将唤醒发送的数据，读出来，清空读缓存区）
   void wakeupTaskRead() const;
   // 唤醒线程处理任务 （向唤醒的线程写数据， 唤醒线程）
@@ -99,12 +112,13 @@ private:
   // 任务中的函数，可能会被多个Loop来调用， 所以会有互斥访问
   // 所以要加锁
   void processTask();
-  // 处理AddTask中的ADD事件
-  int handleAddOperatorTask(Channel* channel);
-  // 处理AddTask中的删除事件
-  int handleDeleteOperatorTask(Channel* channel);
-  // 处理AddTask中的修改事件
-  int handleModifyOperatorTask(Channel* channel);
+
+//  // 处理AddTask中的ADD事件
+//  int handleAddOperatorTask(Channel* channel);
+//  // 处理AddTask中的删除事件
+//  int handleDeleteOperatorTask(Channel* channel);
+//  // 处理AddTask中的修改事件
+//  int handleModifyOperatorTask(Channel* channel);
 
 private:
   // 退出标志
@@ -114,8 +128,9 @@ private:
   std::unique_ptr<IDispatcher> dispatcher_;
 
   // 任务队列, 用来存储任务，类似muduo的pending functor
+  std::list<Functor> functors_;
 //  std::queue<Node*> taskQueue_;
-  std::list<Node*> taskQueue_;
+//  std::list<Node*> taskQueue_;
   // 用来保护上述队列的互斥锁
   std::mutex mutex_;
 

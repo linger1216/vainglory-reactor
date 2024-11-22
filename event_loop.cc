@@ -20,7 +20,7 @@ EventLoop::EventLoop(const char* threadName)
       isRunning_(false),
       dispatcher_(new EpollDispatcher(this)) {
 
-  Debug("%s is create, [%p]", threadName, std::this_thread::get_id());
+  Debug("%s is create,", threadName);
 
   fd2ChannelMap_.clear();
 
@@ -30,18 +30,20 @@ EventLoop::EventLoop(const char* threadName)
   if (wakeupFd_ < 0) {
     Error("create wake up event fd failed");
   }
+
   wakeupChannel_ = new Channel(wakeupFd_, FDEvent::ReadEvent,
                                std::bind(&EventLoop::wakeupTaskRead, this),
                                nullptr,
                                nullptr, nullptr, this);
-  AddTask(wakeupChannel_, EventLoopOperator::Add);
+
+  AddChannelReadEventInLoop(wakeupChannel_);
 }
 
 EventLoop::~EventLoop() {
   Debug("EventLoop %p stop looping", this);
   wakeupChannel_->DisableAll();
-  AddTask(wakeupChannel_, EventLoopOperator::Update);
-  AddTask(wakeupChannel_, EventLoopOperator::Delete);
+  //  AddTask(wakeupChannel_, EventLoopOperator::Update);
+  //  AddTask(wakeupChannel_, EventLoopOperator::Delete);
   delete wakeupChannel_;
   close(wakeupFd_);
   fd2ChannelMap_.clear();
@@ -80,7 +82,7 @@ void EventLoop::wakeupTaskRead() const {
   if (n != sizeof(one)) {
     Error("wakeupRead reads %ld bytes instead of 8", n);
   }
-  Debug("%s wakeupTask read signal [%p]", threadName_.c_str(), std::this_thread::get_id());
+  Debug("%s wakeupTask read signal", threadName_.c_str());
 }
 
 void EventLoop::wakeupTask() const {
@@ -89,7 +91,7 @@ void EventLoop::wakeupTask() const {
   if (n != sizeof(one)) {
     Error("wakeupTask writes %ld bytes instead of 8", n);
   }
-  Debug("%s wakeupTask writes signal [%p]", threadName_.c_str(), std::this_thread::get_id());
+  Debug("%s wakeupTask writes signal", threadName_.c_str());
 }
 
 
@@ -105,80 +107,40 @@ void EventLoop::Quit() {
 }
 
 void EventLoop::processTask() {
-  // TODO 可能有点小问题，判断empty并没有加锁
-  while (!taskQueue_.empty()) {
-    Node* node = nullptr;
+  while (!functors_.empty()) {
+    Functor node = nullptr;
     {
       std::lock_guard<std::mutex> locker(mutex_);
-      if (taskQueue_.empty()) continue;
-      node = taskQueue_.front();
-      taskQueue_.pop_front();
+      node = functors_.front();
+      functors_.pop_front();
     }
     if (node == nullptr) continue;
-
-    Debug("%s processTask channel:%d【%s】[%p]", threadName_.c_str(), node->channel->Fd(), EventLoopOperatorToString(node->op), std::this_thread::get_id());
-    switch (node->op) {
-      case EventLoopOperator::Add:
-        handleAddOperatorTask(node->channel);
-        break;
-      case EventLoopOperator::Update:
-        handleModifyOperatorTask(node->channel);
-        break;
-      case EventLoopOperator::Delete:
-        handleDeleteOperatorTask(node->channel);
-        break;
-    }
-    delete node;
+    node();
+    //    Debug("%s processFunctor channel:%d【%s】[%p]", threadName_.c_str(), node->channel->Fd(), EventLoopOperatorToString(node->op)
+    //    switch (node->op) {
+    //      case EventLoopOperator::Add:
+    //        handleAddOperatorTask(node->channel);
+    //        break;
+    //      case EventLoopOperator::Update:
+    //        handleModifyOperatorTask(node->channel);
+    //        break;
+    //      case EventLoopOperator::Delete:
+    //        handleDeleteOperatorTask(node->channel);
+    //        break;
+    //    }
+    //    delete node;
   }
 }
 
-int EventLoop::handleAddOperatorTask(Channel* channel) {
-  int fd = channel->Fd();
-  auto it = fd2ChannelMap_.find(fd);
-  if (it == fd2ChannelMap_.end()) {
-    fd2ChannelMap_.insert(std::make_pair(fd, channel));
-    return dispatcher_->Add(channel);
-  }
-  return 0;
-}
-
-int EventLoop::handleDeleteOperatorTask(Channel* channel) {
-  int fd = channel->Fd();
-  auto it = fd2ChannelMap_.find(fd);
-  if (it != fd2ChannelMap_.end()) {
-    return dispatcher_->Delete(channel);
-  }
-  return 0;
-}
-
-int EventLoop::handleModifyOperatorTask(Channel* channel) {
-  int fd = channel->Fd();
-  auto it = fd2ChannelMap_.find(fd);
-  if (it != fd2ChannelMap_.end()) {
-    return dispatcher_->Update(channel);
-  }
-  return 0;
-}
-int EventLoop::AddTask(Channel* channel, EventLoopOperator type) {
-  assert(channel != nullptr);
-  {
-    std::lock_guard<std::mutex> locker(mutex_);
-    auto node = new Node(channel, type);
-//    Debug("%s addTask channel:%d【%s】[%p]", threadName_.c_str(), channel->Fd(), EventLoopOperatorToString(type), std::this_thread::get_id());
-//    taskQueue_.push(node);
-    taskQueue_.push_back(node);
-  }
-  for(auto iter = taskQueue_.begin(); iter != taskQueue_.end(); iter++) {
-    Debug("%s QUEUE -> channel:%d【%s】[%p]", threadName_.c_str(), channel->Fd(), EventLoopOperatorToString(type), std::this_thread::get_id());
-  }
-
-  if (!IsInLoopThread()) {
-    wakeupTask();
-  } else {
-    processTask();
-  }
-  return 0;
-}
+//int EventLoop::handleAddOperatorTask(Channel* channel) {
+////  int fd = channel->Fd();
+////  auto it = fd2ChannelMap_.find(fd);
+////  if (it == fd2ChannelMap_.end()) {
+////    fd2ChannelMap_.insert(std::make_pair(fd, channel));
+////    return dispatcher_->Add(channel);
+////  }
+//  return 0;
+//}
 
 // 释放channel资源
 int EventLoop::DestroyChannel(Channel* channel) {
@@ -186,7 +148,7 @@ int EventLoop::DestroyChannel(Channel* channel) {
   if (it != fd2ChannelMap_.end()) {
     fd2ChannelMap_.erase(it);
     close(channel->Fd());
-    Debug("%s 删除fd2ChannelMap_中的channel映射, 关闭fd描述符 [%p]", threadName_.c_str(), std::this_thread::get_id());
+    Debug("%s 删除fd2ChannelMap_中的channel映射, 关闭fd描述符", threadName_.c_str());
   }
   return 0;
 }
@@ -195,4 +157,40 @@ std::thread::id EventLoop::GetThreadId() const {
 }
 const char* EventLoop::Name() const {
   return threadName_.c_str();
+}
+int EventLoop::RunInLoop(EventLoop::Functor fn) {
+  return IsInLoopThread() ? fn() : QueueInLoop(fn);
+}
+
+int EventLoop::QueueInLoop(EventLoop::Functor fn) {
+  {
+    std::lock_guard<std::mutex> locker(mutex_);
+    functors_.push_back(fn);
+  }
+  if (!IsInLoopThread()) {
+    wakeupTask();
+  } else {
+    processTask();
+  }
+  return 0;
+}
+
+int EventLoop::AddChannelReadEventInLoop(Channel* channel) {
+  return RunInLoop(std::bind(&EventLoop::addChannelReadEvent, this, channel));
+}
+int EventLoop::UpdateChannelReadEventInLoop(Channel* channel) {
+  return RunInLoop(std::bind(&EventLoop::updateChannelReadEvent, this, channel));
+}
+int EventLoop::DeleteChannelReadEventInLoop(Channel* channel) {
+  return RunInLoop(std::bind(&EventLoop::deleteChannelReadEvent, this, channel));
+}
+
+int EventLoop::addChannelReadEvent(Channel* channel) {
+  return dispatcher_->Add(channel);
+}
+int EventLoop::updateChannelReadEvent(Channel* channel) {
+  return dispatcher_->Update(channel);
+}
+int EventLoop::deleteChannelReadEvent(Channel* channel) {
+  return dispatcher_->Delete(channel);
 }

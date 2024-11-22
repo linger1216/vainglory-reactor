@@ -8,15 +8,16 @@
 #pragma once
 
 #include <chrono>
-#include <cstring>
 #include <cstdio>
+#include <cstring>
 #include <ctime>
+#include <iomanip>
 #include <iostream>
+#include <mutex>
 #include <sstream>
+#include <thread>
 #include <type_traits>
 #include <vector>
-#include <iomanip>
-#include <mutex>
 
 #define FILE_NAME strrchr(__FILE__, '/') ? strrchr(__FILE__, '/') + 1 : __FILE__
 
@@ -59,6 +60,14 @@ static inline typename std::enable_if<!is_rangeloop_supported<T>::value, std::st
   return ss.str();
 }
 
+
+static inline const char* tid() {
+  auto tid = std::this_thread::get_id();
+  std::stringstream ss;
+  ss << tid;
+  return ss.str().c_str();
+}
+
 static inline void logy_header(const char* tag) {
   char timestamp[100] = "";
   auto now = std::chrono::system_clock::now();
@@ -78,8 +87,10 @@ template<typename... T>
 static inline void logy_body(const char* file, int line, const char* func, T... args) {
   {
     std::lock_guard<std::mutex> guard(g_logy_mutex);
-//    std::fprintf(stderr, "[%s:%d] [%s] ", file, line, func);
-    std::fprintf(stderr, "[%s:%d] ", file, line);
+    //  std::fprintf(stderr, "[%s:%d] [%s] ", file, line, func); 带函数名
+
+    std::fprintf(stderr, "[%s:%d] [%s] ", file, line, tid()); // 带线程id
+    //    std::fprintf(stderr, "[%s:%d] ", file, line);
     std::fprintf(stderr, args...);
     std::fprintf(stderr, "\n");
     std::fflush(stderr);

@@ -9,7 +9,7 @@ WorkThread::WorkThread(int index)
     : thread_(nullptr), eventLoop_(nullptr) {
   name_ = "WorkEventLoop:" + std::to_string(index);
 
-  Debug("%s created [%p]", name_.c_str(), std::this_thread::get_id());
+  Debug("%s created", name_.c_str());
 }
 
 WorkThread::~WorkThread() {
@@ -19,7 +19,7 @@ WorkThread::~WorkThread() {
 
 //
 void WorkThread::Run(){
-  Debug("%s run [%p]", name_.c_str(), std::this_thread::get_id());
+  Debug("%s run", name_.c_str());
   thread_ = new std::thread(&WorkThread::subRun, this);
   // 如果没有条件变量， 可能在Run执行完成后，eventLoop还没有初始化完成，
   // 在后期使用_eventLoop的时候，可能造成空指针异常，导致程序崩溃。

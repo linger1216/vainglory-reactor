@@ -39,7 +39,7 @@ int EpollDispatcher::Delete(Channel* channel) {
   // TODO
   // 需要把当前channel的fd资源删除
   // 本意要执行destroy的回调。但tm需要仔细思考思考
-  Debug("底层不在监听channel %d的监听事件[%p]", channel->Fd(), std::this_thread::get_id());
+  Debug("底层不在监听channel %d的监听事件[%p]", channel->Fd());
   channel->ExecCallback(channel->Arg(), FDEvent::CloseEvent);
   return 0;
 }
@@ -53,7 +53,7 @@ int EpollDispatcher::Dispatch(int timeoutMs) {
                          static_cast<int>(events_.size()),
                          timeoutMs);
   if (numEvents > 0) {
-    Debug("%s epoll_wait with %d events handlers [%p]", loop_->Name(), numEvents, std::this_thread::get_id());
+    Debug("%s epoll_wait with %d events handlers", loop_->Name(), numEvents);
     // 我们的设计更好, 直接在这里调用cb，
     // muduo还要两次循环, 这里一次，event loop还有一次
     for (int i = 0; i < numEvents; i++) {

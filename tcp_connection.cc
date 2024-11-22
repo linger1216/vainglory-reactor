@@ -30,7 +30,7 @@ TcpConnection::TcpConnection(int fd, EventLoop* eventLoop,
       writeCompleteCallback_(std::move(writeCompleteCallback)) {
 
   name_ = "TcpConnection-" + std::to_string(fd);
-  Debug("创建TCP连接, connName: %s [%p]", name_.c_str(), std::this_thread::get_id());
+  Debug("创建TCP连接, connName: %s", name_.c_str());
   readBuf_ = new Buffer(BUFFER_SIZE);
   writeBuf_ = new Buffer(BUFFER_SIZE);
 
@@ -48,8 +48,7 @@ TcpConnection::TcpConnection(int fd, EventLoop* eventLoop,
                          closeHandler,
                          errorHandler,
                          this);
-
-  eventLoop_->AddTask(channel_, EventLoopOperator::Add);
+  eventLoop_->AddChannelReadEventInLoop(channel_);
 }
 
 TcpConnection::~TcpConnection() {
@@ -57,7 +56,7 @@ TcpConnection::~TcpConnection() {
   delete channel_;
   delete readBuf_;
   delete writeBuf_;
-  Debug("%s 释放读写缓冲区,channel内存 [%p]", name_.c_str(), std::this_thread::get_id());
+  Debug("%s 释放读写缓冲区,channel内存", name_.c_str());
 }
 
 int TcpConnection::readHandler(void* arg) {
@@ -68,8 +67,9 @@ int TcpConnection::readHandler(void* arg) {
     messageCallback_(conn, conn->readBuf_, count);
   } else if (count == 0) {
     // 没有读到数据，关闭连接
-    Debug("client down, so we close connection [%p]", std::this_thread::get_id());
-    conn->eventLoop_->AddTask(conn->channel_, EventLoopOperator::Delete);
+    Debug("client down, so we close connection");
+//    conn->eventLoop_->AddTask(conn->channel_, EventLoopOperator::Delete);
+    conn->eventLoop_->DeleteChannelReadEventInLoop(conn->channel_);
   } else {
     Error("read error, error code: %d\n", SocketHelper::GetSocketError(conn->channel_->Fd()));
   }
@@ -90,16 +90,17 @@ int TcpConnection::writeHandler(void* arg) {
         // 1. 不在检测写事件
         conn->channel_->DisableWriting();
         // 2. 修改dispathcer检测的集合 -- 添加节点
-        conn->eventLoop_->AddTask(conn->channel_, EventLoopOperator::Update);
-
+//        conn->eventLoop_->AddTask(conn->channel_, EventLoopOperator::Update);
+        conn->eventLoop_->UpdateChannelReadEventInLoop(conn->channel_);
         if (writeCompleteCallback_ != nullptr) {
           writeCompleteCallback_(conn);
         }
       }
     } else {
       // 没有写到数据，关闭连接
-      Debug("write 0 bytes, means connection is down, so we close connection\n");
-      conn->eventLoop_->AddTask(conn->channel_, EventLoopOperator::Delete);
+      Debug("write 0 bytes, means connection is down, so we close connection");
+//      conn->eventLoop_->AddTask(conn->channel_, EventLoopOperator::Delete);
+      conn->eventLoop_->UpdateChannelReadEventInLoop(conn->channel_);
     }
   }
   return 0;
@@ -115,7 +116,7 @@ int TcpConnection::errorHandler(void* arg) {
 int TcpConnection::closeHandler(void* arg) {
   assert(eventLoop_->IsInLoopThread());
   auto conn = static_cast<TcpConnection*>(arg);
-  Debug("closeHandler arg:%p, 准备删除此连接 [%p]", arg, std::this_thread::get_id());
+  Debug("closeHandler arg:%p, 准备删除此连接", arg);
   delete conn;
   return 0;
 }
