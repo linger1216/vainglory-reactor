@@ -33,11 +33,8 @@ TcpServer::TcpServer(unsigned short port, int threadNum,
   mainEventLoop_ = new EventLoop();
 
   // 创建监听器
-  acceptor_ = new Acceptor(mainEventLoop_,
-                           netAddress_,
-                           std::bind(&TcpServer::connectedCallback,
-                                     this, std::placeholders::_1,
-                                     std::placeholders::_2));
+  acceptor_ = new Acceptor(mainEventLoop_, netAddress_,
+                           std::bind(&TcpServer::newConnectionCallback, this, std::placeholders::_1, std::placeholders::_2));
 
   // 创建线程池
   threadPool_ = new ThreadPool(mainEventLoop_, threadNum);
@@ -101,21 +98,20 @@ void TcpServer::removeConnection(const TcpConnection* conn) {
 // 放在一个线程中进行处理
 // 得到了client id后，不能在主线程中去处理通信的相关流程了
 // 需要从线程池得到一个合适的工作线程， 委托他使用Tcp Connection来通信相关处理
-void TcpServer::connectedCallback(int clientFd, const INetAddress& peerAddr) {
+void TcpServer::newConnectionCallback(int clientFd, const INetAddress* peerAddr) {
 
-  INetAddress localAddr(SocketHelper::GetLocalAddr(clientFd));
+  auto addr = SocketHelper::GetLocalAddr(clientFd);
+  INetAddress localAddr(&addr);
 
-  Debug("收到新连接 from %s", peerAddr.IpPort().c_str());
+  Debug("收到新连接 from %s", peerAddr->IpPort().c_str());
   EventLoop* ioLoop = threadPool_->GetNextEventLoop();
   Debug("从线程池取一个IO事件循环, 因为运行在线程池的, 所以一定是非主线程");
   // TODO:
   // 新建的tcpConnection资源什么时候释放？
   auto name = "TcpConnection-" + std::to_string(clientFd);
-  auto conn = new TcpConnection(name.c_str(), clientFd, ioLoop,
-                                localAddr, peerAddr,
+  auto conn = new TcpConnection(name.c_str(), clientFd, ioLoop, &localAddr, peerAddr,
                                 connectionCallback_,
-                                std::bind(&TcpServer::removeConnection,
-                                          this, std::placeholders::_1),
+                                std::bind(&TcpServer::removeConnection, this, std::placeholders::_1),
                                 messageCallback_,
                                 writeCompleteCallback_);
   connections_[name] = conn;

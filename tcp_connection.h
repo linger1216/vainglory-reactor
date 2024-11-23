@@ -28,8 +28,8 @@ public:
 
   ~TcpConnection();
   explicit TcpConnection(const char* name, int fd, EventLoop* eventLoop,
-                         const INetAddress& localAddr,
-                         const INetAddress& peerAddr,
+                         const INetAddress* localAddr,
+                         const INetAddress* peerAddr,
                          ConnectionCallback connectionCallback,
                          CloseCallback closeCallback,
                          MessageCallback messageCallback,

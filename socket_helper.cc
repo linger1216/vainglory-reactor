@@ -126,25 +126,14 @@ void SocketHelper::ToIpPort(char* buf, size_t size, const struct sockaddr* addr)
 }
 
 void SocketHelper::ToIp(char* buf, size_t size, const struct sockaddr* addr) {
-  if (addr->sa_family == AF_INET) {
-    assert(size >= INET_ADDRSTRLEN);
-    const struct sockaddr_in* addr4 = to_sockaddr_in(addr);
-    ::inet_ntop(AF_INET, &addr4->sin_addr, buf, static_cast<socklen_t>(size));
-  } else if (addr->sa_family == AF_INET6) {
-    assert(size >= INET6_ADDRSTRLEN);
-    const struct sockaddr_in6* addr6 = to_sockaddr_in6(addr);
-    ::inet_ntop(AF_INET6, &addr6->sin6_addr, buf, static_cast<socklen_t>(size));
-  }
+  assert(size >= INET_ADDRSTRLEN);
+  const struct sockaddr_in* addr4 = to_sockaddr_in(addr);
+  ::inet_ntop(AF_INET, &addr4->sin_addr, buf, static_cast<socklen_t>(size));
 }
 int SocketHelper::FromIpPort(const char* ip, uint16_t port, struct sockaddr_in* addr) {
   addr->sin_family = AF_INET;
   addr->sin_port = hostToNetwork16(port);
   return ::inet_pton(AF_INET, ip, &addr->sin_addr);
-}
-int SocketHelper::FromIpPort(const char* ip, uint16_t port, struct sockaddr_in6* addr) {
-  addr->sin6_family = AF_INET6;
-  addr->sin6_port = hostToNetwork16(port);
-  return ::inet_pton(AF_INET, ip, &addr->sin6_addr);
 }
 
 int SocketHelper::GetSocketError(int socketFd) {
@@ -164,12 +153,11 @@ bool SocketHelper::IsSelfConnect(int socketFd) {
 /*
  * 获取本地地址
  */
-struct sockaddr_in6 SocketHelper::GetLocalAddr(int socketFd) {
-  struct sockaddr_in6 localAddr;
+struct sockaddr_in SocketHelper::GetLocalAddr(int socketFd) {
+  sockaddr_in localAddr;
   bzero(&localAddr, sizeof localAddr);
   auto addrLen = static_cast<socklen_t>(sizeof localAddr);
-  int ret = ::getsockname(socketFd, to_sockaddr(&localAddr),
-                          &addrLen);
+  int ret = ::getsockname(socketFd, const_cast<sockaddr*>(to_sockaddr(&localAddr)), &addrLen);
   if (ret < 0) {
     Warn("Error in sockets::GetLocalAddr");
   }
@@ -179,11 +167,11 @@ struct sockaddr_in6 SocketHelper::GetLocalAddr(int socketFd) {
 /*
  * 获取对端地址
  */
-struct sockaddr_in6 SocketHelper::GetPeerAddr(int socketFd) {
-  struct sockaddr_in6 peerAddr;
+struct sockaddr_in SocketHelper::GetPeerAddr(int socketFd) {
+  struct sockaddr_in peerAddr;
   bzero(&peerAddr, sizeof peerAddr);
   socklen_t addrLen = static_cast<socklen_t>(sizeof peerAddr);
-  int ret = ::getpeername(socketFd, to_sockaddr(&peerAddr),
+  int ret = ::getpeername(socketFd, const_cast<sockaddr*>(to_sockaddr(&peerAddr)),
                           &addrLen);
   if (ret < 0) {
     Warn("Error in sockets::GetPeerAddr");
@@ -195,17 +183,8 @@ struct sockaddr_in6 SocketHelper::GetPeerAddr(int socketFd) {
 const struct sockaddr* SocketHelper::to_sockaddr(const struct sockaddr_in* addr) {
   return reinterpret_cast<const struct sockaddr*>(addr);
 }
-struct sockaddr* SocketHelper::to_sockaddr(struct sockaddr_in6* addr) {
-  return reinterpret_cast<struct sockaddr*>(addr);
-}
-const struct sockaddr* SocketHelper::to_sockaddr(const struct sockaddr_in6* addr) {
-  return reinterpret_cast<const struct sockaddr*>(addr);
-}
 const struct sockaddr_in* SocketHelper::to_sockaddr_in(const struct sockaddr* addr) {
   return reinterpret_cast<const struct sockaddr_in*>(addr);
-}
-const struct sockaddr_in6* SocketHelper::to_sockaddr_in6(const struct sockaddr* addr) {
-  return reinterpret_cast<const struct sockaddr_in6*>(addr);
 }
 int SocketHelper::SetTcpNoDelay(int socketFd, bool on) {
   int optval = on ? 1 : 0;

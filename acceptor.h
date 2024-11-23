@@ -14,7 +14,7 @@ class Channel;
 
 class Acceptor : public NoCopyable {
 public:
-  explicit Acceptor(EventLoop* loop, const INetAddress* listenAddr, ConnectedCallback cb);
+  explicit Acceptor(EventLoop* loop, const INetAddress* listenAddr, NewConnectionCallback cb);
   ~Acceptor();
   int Listen();
 private:
@@ -22,7 +22,7 @@ private:
   EventLoop* loop_;
   int acceptSocketFd_;
   Channel* acceptChannel_;
-  ConnectedCallback connectedCallback_;
+  NewConnectionCallback newConnectionCallback;
 };
 
 

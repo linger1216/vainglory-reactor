@@ -23,16 +23,12 @@ public:
   static void ToIpPort(char* buf, size_t size, const struct sockaddr* addr);
   static void ToIp(char* buf, size_t size, const struct sockaddr* addr);
   static int FromIpPort(const char* ip, uint16_t port, struct sockaddr_in* addr);
-  static int FromIpPort(const char* ip, uint16_t port, struct sockaddr_in6* addr);
   static int GetSocketError(int socketFd);
   static bool IsSelfConnect(int socketFd);
-  static struct sockaddr_in6 GetLocalAddr(int socketFd);
-  static struct sockaddr_in6 GetPeerAddr(int socketFd);
+  static struct sockaddr_in GetLocalAddr(int socketFd);
+  static struct sockaddr_in GetPeerAddr(int socketFd);
   static const struct sockaddr* to_sockaddr(const struct sockaddr_in* addr);
-  static struct sockaddr* to_sockaddr(struct sockaddr_in6* addr);
-  static const struct sockaddr* to_sockaddr(const struct sockaddr_in6* addr);
   static const struct sockaddr_in* to_sockaddr_in(const struct sockaddr* addr);
-  static const struct sockaddr_in6* to_sockaddr_in6(const struct sockaddr* addr);
 
   // Set sockfd operations
   static int SetTcpNoDelay(int socketFd, bool on); // Nagle's algorithm

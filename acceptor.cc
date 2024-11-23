@@ -12,8 +12,8 @@
 /*
  * 调用的线程必须和创建线程是一致的, 也就是"主线程";
  */
-Acceptor::Acceptor(EventLoop* loop, const INetAddress* listenAddr, ConnectedCallback cb)
-    : loop_(loop), acceptChannel_(nullptr), connectedCallback_(std::move(cb)) {
+Acceptor::Acceptor(EventLoop* loop, const INetAddress* listenAddr, NewConnectionCallback cb)
+    : loop_(loop), acceptChannel_(nullptr), newConnectionCallback(std::move(cb)) {
 
   int acceptSocketFd = SocketHelper::CreateSocket(AF_INET);
   SocketHelper::SetReuseAddr(acceptSocketFd, true);
@@ -31,14 +31,14 @@ Acceptor::Acceptor(EventLoop* loop, const INetAddress* listenAddr, ConnectedCall
 void Acceptor::handleAccept() {
   loop_->AssertInLoop();
 
-  INetAddress peerAddr(0);
+  INetAddress peerAddr(0, false);
   int clientFd = SocketHelper::Accept(acceptSocketFd_, peerAddr.GetSockAddr());
   auto peer = SocketHelper::to_sockaddr_in(peerAddr.GetSockAddr());
   Debug("有个新的客户端 %s:%d", inet_ntoa(peer->sin_addr), ntohs(peer->sin_port));
 
   // 此处是要求必须有回调函数的, 如果没有就放弃这个连接.
-  if (connectedCallback_) {
-    connectedCallback_(clientFd, &peerAddr);
+  if (newConnectionCallback) {
+    newConnectionCallback(clientFd, &peerAddr);
   } else {
     SocketHelper::Close(clientFd);
   }
