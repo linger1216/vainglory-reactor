@@ -8,8 +8,6 @@
 WorkThread::WorkThread(int index)
     : thread_(nullptr), eventLoop_(nullptr) {
   name_ = "WorkEventLoop:" + std::to_string(index);
-
-  Debug("%s created", name_.c_str());
 }
 
 WorkThread::~WorkThread() {

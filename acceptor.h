@@ -20,7 +20,6 @@ public:
 private:
   void handleAccept();
   EventLoop* loop_;
-  int acceptSocketFd_;
   Channel* acceptChannel_;
   NewConnectionCallback newConnectionCallback;
 };

@@ -32,7 +32,7 @@ void Acceptor::handleAccept() {
   loop_->AssertInLoop();
 
   INetAddress peerAddr(0, false);
-  int clientFd = SocketHelper::Accept(acceptSocketFd_, peerAddr.GetSockAddr());
+  int clientFd = SocketHelper::Accept(acceptChannel_->Fd(), peerAddr.GetSockAddr());
   auto peer = SocketHelper::to_sockaddr_in(peerAddr.GetSockAddr());
   Debug("有个新的客户端 %s:%d", inet_ntoa(peer->sin_addr), ntohs(peer->sin_port));
 

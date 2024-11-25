@@ -52,13 +52,10 @@ int SocketHelper::Accept(int socketFd, const struct sockaddr* addr) {
   int clientFd = ::accept4(socketFd,
                            const_cast<sockaddr*>(addr),
                            &addrLen, SOCK_NONBLOCK | SOCK_CLOEXEC);
-  if (clientFd == -1) {
-    Error("accept connection error");
-  }
-
   if (clientFd < 0) {
     int savedErrno = errno;
     // the meaning of the errno??
+    Debug("accept connection error: %s", strerror(savedErrno));
     switch (savedErrno) {
       // temporary error
       case EAGAIN:

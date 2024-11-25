@@ -189,12 +189,14 @@ int EventLoop::DeleteChannelEventInLoop(Channel* channel) {
 }
 
 int EventLoop::addChannelEvent(Channel* channel) {
+  fd2ChannelMap_.insert(std::make_pair(channel->Fd(), channel));
   return dispatcher_->Add(channel);
 }
 int EventLoop::updateChannelEvent(Channel* channel) {
   return dispatcher_->Update(channel);
 }
 int EventLoop::deleteChannelEvent(Channel* channel) {
+  fd2ChannelMap_.erase(channel->Fd());
   return dispatcher_->Delete(channel);
 }
 void EventLoop::AssertInLoop() {
