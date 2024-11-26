@@ -30,7 +30,6 @@ public:
   explicit TcpConnection(const char* name, int fd, EventLoop* eventLoop,
                          const INetAddress* localAddr,
                          const INetAddress* peerAddr,
-                         ConnectionCallback connectionCallback,
                          CloseCallback closeCallback,
                          MessageCallback messageCallback,
                          WriteCompleteCallback writeCompleteCallback);
@@ -41,6 +40,7 @@ public:
   const char* PeerIpPort();
   int Close();
 private:
+  const char* stateToString() const;
   int readHandler(void* arg);
   int writeHandler(void* arg);
   int closeHandler(void* arg);
@@ -52,15 +52,12 @@ private:
   Channel* channel_;
   Buffer* readBuf_;
   Buffer* writeBuf_;
-  std::atomic_int  status_;
-
+  Status  status_;
   INetAddress localAddr_;
   INetAddress peerAddr_;
-  ConnectionCallback connectionCallback_;
   MessageCallback messageCallback_;
   CloseCallback closeCallback_;
   WriteCompleteCallback writeCompleteCallback_;
-
   size_t highWaterMark_;
   HighWaterMarkCallback highWaterMarkCallback_;
 };

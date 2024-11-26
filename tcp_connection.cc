@@ -7,26 +7,24 @@
 #include "buffer.h"
 #include "channel.h"
 #include "event_loop.h"
+#include "inet_address.h"
 #include "log.h"
 #include "socket_helper.h"
 #include <cassert>
 #include <unistd.h>
 #include <utility>
-#include "inet_address.h"
 
 TcpConnection::TcpConnection(const char* name, int fd, EventLoop* eventLoop,
                              const INetAddress* localAddr,
                              const INetAddress* peerAddr,
-                             ConnectionCallback connectionCallback,
                              CloseCallback closeCallback,
                              MessageCallback messageCallback,
                              WriteCompleteCallback writeCompleteCallback)
     : name_(name),
       loop_(eventLoop),
-      status_(static_cast<int>(Status::Disconnected)),
+      status_(Status::Disconnected),
       localAddr_(*localAddr),
       peerAddr_(*peerAddr),
-      connectionCallback_(std::move(connectionCallback)),
       closeCallback_(std::move(closeCallback)),
       messageCallback_(std::move(messageCallback)),
       writeCompleteCallback_(std::move(writeCompleteCallback)) {
@@ -45,10 +43,8 @@ TcpConnection::TcpConnection(const char* name, int fd, EventLoop* eventLoop,
   SocketHelper::SetKeepAlive(fd, true);
 
   channel_ = new Channel(fd, FDEvent::ReadEvent,
-                         readHandler,
-                         writeHandler,
-                         closeHandler,
-                         errorHandler,
+                         readHandler, writeHandler,
+                         closeHandler, errorHandler,
                          this);
   loop_->AddChannelEventInLoop(channel_);
 }
@@ -70,7 +66,7 @@ int TcpConnection::readHandler(void* arg) {
   } else if (count == 0) {
     // 没有读到数据，关闭连接
     Debug("client down, so we close connection");
-//    conn->loop_->AddTask(conn->channel_, EventLoopOperator::Delete);
+    //    conn->loop_->AddTask(conn->channel_, EventLoopOperator::Delete);
     conn->loop_->DeleteChannelEventInLoop(conn->channel_);
   } else {
     Error("read error, error code: %d\n", SocketHelper::GetSocketError(conn->channel_->Fd()));
@@ -92,7 +88,7 @@ int TcpConnection::writeHandler(void* arg) {
         // 1. 不在检测写事件
         conn->channel_->DisableWriting();
         // 2. 修改dispathcer检测的集合 -- 添加节点
-//        conn->loop_->AddTask(conn->channel_, EventLoopOperator::Update);
+        //        conn->loop_->AddTask(conn->channel_, EventLoopOperator::Update);
         conn->loop_->UpdateChannelEventInLoop(conn->channel_);
         if (writeCompleteCallback_ != nullptr) {
           writeCompleteCallback_(conn);
@@ -101,7 +97,7 @@ int TcpConnection::writeHandler(void* arg) {
     } else {
       // 没有写到数据，关闭连接
       Debug("write 0 bytes, means connection is down, so we close connection");
-//      conn->loop_->AddTask(conn->channel_, EventLoopOperator::Delete);
+      //      conn->loop_->AddTask(conn->channel_, EventLoopOperator::Delete);
       conn->loop_->UpdateChannelEventInLoop(conn->channel_);
     }
   }
@@ -117,9 +113,17 @@ int TcpConnection::errorHandler(void* arg) {
 
 int TcpConnection::closeHandler(void* arg) {
   assert(loop_->IsInLoopThread());
-  auto conn = static_cast<TcpConnection*>(arg);
+//  auto conn = static_cast<TcpConnection*>(arg);
+  Debug("fd=%d state = %s", channel_->Fd(), stateToString());
+  assert(status_ == Status::Connected || status_ == Status::Disconnecting);
+  status_ = Status::Disconnected;
+
+  // 去除channel的底层事件监听
+  channel_->DisableAll();
+  loop_->UpdateChannelEventInLoop(channel_);
+
   Debug("closeHandler arg:%p, 准备删除此连接", arg);
-  delete conn;
+//  delete conn;
   return 0;
 }
 
@@ -144,7 +148,7 @@ void TcpConnection::Send(const char* data, size_t len) {
   size_t remaining = len;
   bool faultError = false;
 
-  if (status_ == static_cast<int>(Status::Disconnected)) {
+  if (status_ == Status::Disconnected) {
     Error("disconnected, give up writing");
     return;
   }
@@ -237,13 +241,27 @@ EventLoop* TcpConnection::Loop() {
 }
 
 int TcpConnection::Close() {
-  loop_->AssertInLoop();
-  if (status_ == static_cast<int>(Status::Connected)) {
-    channel_->DisableAll();
-    if (connectionCallback_) {
-      connectionCallback_(this);
-    }
-    status_ = static_cast<int>(Status::Disconnected);
-  }
+//  loop_->AssertInLoop();
+//  if (status_ == Status::Connected) {
+//    channel_->DisableAll();
+//    if (connectionCallback_) {
+//      connectionCallback_(this);
+//    }
+//    status_ = Status::Disconnected;
+//  }
   return 0;
+}
+const char* TcpConnection::stateToString() const {
+  switch (status_) {
+    case Status::Disconnected:
+      return "Disconnected";
+    case Status::Connected:
+      return "Connected";
+    case Status::Connecting:
+      return "Connecting";
+    case Status::Disconnecting:
+      return "Disconnecting";
+    default:
+      return "unknown state";
+  }
 }
