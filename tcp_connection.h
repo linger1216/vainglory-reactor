@@ -40,7 +40,7 @@ public:
   const char* PeerIpPort();
 
 private:
-  int destroy();
+//  int destroy();
   const char* stateToString() const;
   int handlerRead(void* arg);
   int handlerWrite(void* arg);

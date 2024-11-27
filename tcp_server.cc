@@ -95,14 +95,13 @@ void TcpServer::destroyConnection(const TcpConnection* conn) {
 // 得到了client id后，不能在主线程中去处理通信的相关流程了
 // 需要从线程池得到一个合适的工作线程， 委托他使用Tcp Connection来通信相关处理
 void TcpServer::newConnectionCallback(int clientFd, const INetAddress* peerAddr) {
-
   auto addr = SocketHelper::GetLocalAddr(clientFd);
   INetAddress localAddr(&addr);
   EventLoop* ioLoop = threadPool_->GetNextEventLoop();
   auto name = "TcpConnection-" + std::to_string(clientFd);
 
   auto conn = new TcpConnection(name.c_str(), clientFd, ioLoop, &localAddr, peerAddr,
-                                std::bind(&TcpServer::destroyConnection, this, std::placeholders::_1),
+                                std::bind(&TcpServer::destroyWrapLoop, this, std::placeholders::_1),
                                 messageCallback_,
                                 writeCompleteCallback_);
   Debug("【资源】新增对象 TcpConnection[%s] = %p", name.c_str(), conn);
@@ -114,4 +113,14 @@ void TcpServer::newConnectionCallback(int clientFd, const INetAddress* peerAddr)
   if (connectionCallback_) {
     connectionCallback_(conn);
   }
+}
+
+// 被直接回调, 来自io线程所以要转换成本地运行.
+void TcpServer::destroyWrapLoop(const TcpConnection* conn) {
+  Debug("TcpServer destroyWrapLoop");
+  auto fn = [this, conn](){
+    this->destroyConnection(conn);
+    return 0; // 返回0，因为EventLoop::Functor期望返回int
+  };
+  mainEventLoop_->RunInLoop(fn);
 }

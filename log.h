@@ -60,19 +60,19 @@ static inline typename std::enable_if<!is_rangeloop_supported<T>::value, std::st
   return ss.str();
 }
 
-
-static inline const char* tid() {
-  auto tid = std::this_thread::get_id();
-  std::stringstream ss;
-  ss << tid;
-  return ss.str().c_str();
-}
-
-static inline const char* tid(std::thread::id tid) {
-  std::stringstream ss;
-  ss << tid;
-  return ss.str().c_str();
-}
+//
+//static inline const char* tid() {
+//  auto tid = std::this_thread::get_id();
+//  std::stringstream ss;
+//  ss << tid;
+//  return ss.str().c_str();
+//}
+//
+//static inline const char* tid(std::thread::id tid) {
+//  std::stringstream ss;
+//  ss << tid;
+//  return ss.str().c_str();
+//}
 
 static inline void logy_header(const char* tag) {
   char timestamp[100] = "";
@@ -95,7 +95,7 @@ static inline void logy_body(const char* file, int line, const char* func, T... 
     std::lock_guard<std::mutex> guard(g_logy_mutex);
     //  std::fprintf(stderr, "[%s:%d] [%s] ", file, line, func); 带函数名
 
-    std::fprintf(stderr, "[%s:%d] [%s] ", file, line, tid()); // 带线程id
+    std::fprintf(stderr, "[%s:%d] [%p] ", file, line, std::this_thread::get_id()); // 带线程id
     //    std::fprintf(stderr, "[%s:%d] ", file, line);
     std::fprintf(stderr, args...);
     std::fprintf(stderr, "\n");

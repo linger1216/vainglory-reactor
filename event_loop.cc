@@ -163,15 +163,16 @@ int EventLoop::RunInLoop(EventLoop::Functor fn) {
 }
 
 int EventLoop::QueueInLoop(EventLoop::Functor fn) {
-
   {
     std::lock_guard<std::mutex> locker(mutex_);
     functors_.push_back(fn);
   }
   Debug("Queue has %d functors", functors_.size());
   if (!IsInLoopThread()) {
+    Debug("wakeup");
     wakeupTask();
   } else {
+    Debug("processTask");
     processTask();
   }
   return 0;

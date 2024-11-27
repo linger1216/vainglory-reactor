@@ -43,7 +43,7 @@ TcpConnection::TcpConnection(const char* name, int fd, EventLoop* eventLoop,
   channel_ = new Channel(fd, FDEvent::ReadEvent,
                          std::bind(&TcpConnection::handlerRead, this, std::placeholders::_1),
                          std::bind(&TcpConnection::handlerWrite, this, std::placeholders::_1),
-                         std::bind(&TcpConnection::destroy, this),
+                         std::bind(&TcpConnection::handlerDestroy, this, std::placeholders::_1),
                          std::bind(&TcpConnection::handlerError, this, std::placeholders::_1),
                          this);
   Debug("【资源】新增对象 Channel fd=%d = %p", fd, channel_);
@@ -81,8 +81,8 @@ int TcpConnection::handlerRead(void* arg) {
     messageCallback_(this, readBuf_, count);
   } else if (count == 0) {
     // 没有读到数据，关闭连接
-    Debug("TcpConnection::handlerRead read 0 byte, so we close connection %s ", tid());
-    destroy();
+    Debug("TcpConnection::handlerRead read 0 byte, so we close connection %p ", std::this_thread::get_id());
+    handlerDestroy(this);
   } else {
     Error("read error, error code: %d\n", SocketHelper::GetSocketError(channel_->Fd()));
   }
@@ -126,9 +126,14 @@ int TcpConnection::handlerError(void* arg) {
   return 0;
 }
 
-int TcpConnection::handlerDestroy(void* arg) {
-  Debug("TcpConnection::handlerDestroy %s ", tid());
 
+int TcpConnection::handlerDestroy(void* arg) {
+  // handlerDestroy 来自两个路径
+  // 1. epoll检测到close事件
+  // 2. epoll在read事件中发现读到的长度为0
+  // 但不管怎么样, 这些都是io线程, io线程处理io线程的资源
+  // io调用上层也就是server的callback, 属于跨线程, 需要wake up and loop
+  Debug("TcpConnection::handlerDestroy");
 
   // 这里应该是来自io线程判断出来读事件为0, 然后调用channel的destroy callback
   // 继而调用的是connection 的handler destroy
@@ -139,6 +144,8 @@ int TcpConnection::handlerDestroy(void* arg) {
   loop_->UpdateChannelEventInLoop(channel_);
   Debug("禁用%d的一切事件", channel_->Fd());
 
+
+  // TODO 有问题, 这里的loop是io, 怎么调用到server里面的callback, 跨线程通知.
   // 调用close Callback
   if (destroyCallback_) {
     destroyCallback_(this);
@@ -256,9 +263,12 @@ EventLoop* TcpConnection::Loop() {
 
 // 这里是很有必要的, 包装一个functor, 让其进入队列唤醒执行.
 // 不能在io线程的空间执行函数
-int TcpConnection::destroy() {
-  Debug("TcpConnection::destroy create:%s invoke:%s", tid(loop_->GetThreadId()), tid());
-  auto fn = std::bind(&TcpConnection::handlerDestroy, this, this);
-  loop_->RunInLoop(fn);
-  return 0;
-}
+//int TcpConnection::destroy() {
+//
+//  loop_->AssertInLoop();
+//
+//  Debug("TcpConnection::destroy create:%p invoke:%p", loop_->GetThreadId(), std::this_thread::get_id());
+//  auto fn = std::bind(&TcpConnection::handlerDestroy, this, this);
+//  loop_->RunInLoop(fn);
+//  return 0;
+//}
