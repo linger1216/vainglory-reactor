@@ -68,6 +68,12 @@ static inline const char* tid() {
   return ss.str().c_str();
 }
 
+static inline const char* tid(std::thread::id tid) {
+  std::stringstream ss;
+  ss << tid;
+  return ss.str().c_str();
+}
+
 static inline void logy_header(const char* tag) {
   char timestamp[100] = "";
   auto now = std::chrono::system_clock::now();

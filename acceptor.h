@@ -14,14 +14,14 @@ class Channel;
 
 class Acceptor : public NoCopyable {
 public:
-  explicit Acceptor(EventLoop* loop, const INetAddress* listenAddr, NewConnectionCallback cb);
+  explicit Acceptor(EventLoop* loop, const INetAddress* listenAddr, AcceptCallback cb);
   ~Acceptor();
   int Listen();
 private:
   void handleAccept();
   EventLoop* loop_;
   Channel* acceptChannel_;
-  NewConnectionCallback newConnectionCallback;
+  AcceptCallback acceptCallback;
 };
 
 

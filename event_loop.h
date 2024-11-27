@@ -75,7 +75,7 @@ public:
 //  int AddTask(Channel* channel, EventLoopOperator type);
 
   // 删除channel对象
-  int DestroyChannel(Channel* channel);
+  int EraseChannelInMap(Channel* channel);
 
   // 返回当前loop的名字
   const char* Name() const;

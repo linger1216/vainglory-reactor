@@ -20,12 +20,14 @@
 
 TcpServer::TcpServer(unsigned short port, int threadNum,
                      ConnectionCallback connectionCallback,
+                     ConnectionCallback destroyCallback,
                      MessageCallback messageCallback,
-                     WriteCompleteCallback writeCompleteCallback)
+                     ConnectionCallback writeCompleteCallback)
     : fd_(-1),
       acceptor_(nullptr),
       netAddress_(new INetAddress(port)),
       connectionCallback_(std::move(connectionCallback)),
+      destroyCallback_(std::move(destroyCallback)),
       messageCallback_(std::move(messageCallback)),
       writeCompleteCallback_(std::move(writeCompleteCallback)) {
 
@@ -35,16 +37,8 @@ TcpServer::TcpServer(unsigned short port, int threadNum,
   // 创建监听器
   acceptor_ = new Acceptor(mainEventLoop_, netAddress_,
                            std::bind(&TcpServer::newConnectionCallback, this, std::placeholders::_1, std::placeholders::_2));
-
   // 创建线程池
   threadPool_ = new ThreadPool(mainEventLoop_, threadNum);
-
-  if (connectionCallback_ == nullptr) {
-    connectionCallback_ = std::bind(&TcpServer::defaultConnectionCallback, this, std::placeholders::_1);
-  }
-  if (messageCallback_ == nullptr) {
-    messageCallback_ = std::bind(&TcpServer::defaultMessageCallback, this, std::placeholders::_1, std::placeholders::_2, std::placeholders::_3);
-  }
 }
 
 
@@ -74,24 +68,26 @@ int TcpServer::Run() {
   return 0;
 }
 
-void TcpServer::defaultConnectionCallback(const TcpConnection* conn) {
-}
-void TcpServer::defaultMessageCallback(const TcpConnection* conn, Buffer* buffer, int n) {
-}
-
-void TcpServer::removeConnection(const TcpConnection* conn) {
+void TcpServer::destroyConnection(const TcpConnection* conn) {
   mainEventLoop_->AssertInLoop();
-  // 主线程需要将他自己拥有的资源移除
-  // 主要就是链表删除这个连接引用, 其他没什么吊事.
-  // 删除资源不在这.
+  // 1. 删除集合中的元素
   auto c = const_cast<TcpConnection*>(conn);
   Debug("释放新连接 from %s", c->PeerIpPort());
   auto n = connections_.erase(c->Name());
   assert(n == 1);
+  Debug("【释放】TcpServer connections 删除了 TcpConnection[%s] = %p", c->Name(), c);
 
+  // 2. 删除资源
   // 关闭资源在io线程中做, 因为这个连接的资源是io线程拥有的
-  auto ioLoop = c->Loop();
-  ioLoop->RunInLoop(std::bind(&TcpConnection::Close, c));
+  //  auto ioLoop = c->Loop();
+  //  ioLoop->RunInLoop(std::bind(&TcpConnection::Destroy, c));
+
+  Debug("【释放】删除对象 TcpConnection[%s] = %p", c->Name(), conn);
+  delete conn;
+
+  if (destroyCallback_) {
+    destroyCallback_(conn);
+  }
 }
 
 // 代表一个新链接建立完毕, 后面的工作是将这个连接的数据接收
@@ -102,17 +98,20 @@ void TcpServer::newConnectionCallback(int clientFd, const INetAddress* peerAddr)
 
   auto addr = SocketHelper::GetLocalAddr(clientFd);
   INetAddress localAddr(&addr);
-
-  Debug("收到新连接 from %s", peerAddr->IpPort().c_str());
   EventLoop* ioLoop = threadPool_->GetNextEventLoop();
-  Debug("从线程池取一个IO事件循环, 因为运行在线程池的, 所以一定是非主线程");
-  // TODO:
-  // 新建的tcpConnection资源什么时候释放？
   auto name = "TcpConnection-" + std::to_string(clientFd);
+
   auto conn = new TcpConnection(name.c_str(), clientFd, ioLoop, &localAddr, peerAddr,
-                                connectionCallback_,
-                                std::bind(&TcpServer::removeConnection, this, std::placeholders::_1),
+                                std::bind(&TcpServer::destroyConnection, this, std::placeholders::_1),
                                 messageCallback_,
                                 writeCompleteCallback_);
+  Debug("【资源】新增对象 TcpConnection[%s] = %p", name.c_str(), conn);
+
   connections_[name] = conn;
+  Debug("【资源】TcpServer connections 添加了 TcpConnection[%s] = %p", name.c_str(), conn);
+
+  // 回调用户层
+  if (connectionCallback_) {
+    connectionCallback_(conn);
+  }
 }

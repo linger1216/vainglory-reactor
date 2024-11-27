@@ -9,14 +9,14 @@
 
 Channel::Channel(int fd, FDEvent events,
                  Channel::EventCallback readCallback, Channel::EventCallback writeCallback,
-                 Channel::EventCallback closeCallback, Channel::EventCallback errorCallback,
+                 Channel::EventCallback destroyCallback, Channel::EventCallback errorCallback,
                  void* arg)
     : fd_(fd), events_(static_cast<int>(events)),
       tied_(false),
       arg_(arg),
       readCallback_(std::move(readCallback)),
       writeCallback_(std::move(writeCallback)),
-      closeCallback_(std::move(closeCallback)),
+      destroyCallback_(std::move(destroyCallback)),
       errorCallback_(std::move(errorCallback)) {
 }
 
@@ -94,9 +94,9 @@ void Channel::execCallbackWithGuard(void* arg, FDEvent event) {
     Debug("Fd = %d Events = %d handle error event", fd_, event);
     errorCallback_(arg);
   }
-  if ((event == FDEvent::CloseEvent) && closeCallback_) {
+  if ((event == FDEvent::CloseEvent) && destroyCallback_) {
     Debug("Fd = %d Events = %d handle close event", fd_, event);
-    closeCallback_(arg);
+    destroyCallback_(arg);
   }
 }
 void* Channel::Arg() {

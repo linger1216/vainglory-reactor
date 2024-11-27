@@ -30,21 +30,22 @@ public:
   explicit TcpConnection(const char* name, int fd, EventLoop* eventLoop,
                          const INetAddress* localAddr,
                          const INetAddress* peerAddr,
-                         CloseCallback closeCallback,
+                         ConnectionCallback destroyCallback,
                          MessageCallback messageCallback,
-                         WriteCompleteCallback writeCompleteCallback);
+                         ConnectionCallback writeCompleteCallback);
 
   void Send(const char* data, size_t len);
   EventLoop* Loop();
   const char* Name();
   const char* PeerIpPort();
-  int Close();
+
 private:
+  int destroy();
   const char* stateToString() const;
-  int readHandler(void* arg);
-  int writeHandler(void* arg);
-  int closeHandler(void* arg);
-  int errorHandler(void* arg);
+  int handlerRead(void* arg);
+  int handlerWrite(void* arg);
+  int handlerDestroy(void* arg);
+  int handlerError(void* arg);
 private:
   const int BUFFER_SIZE = 10240;
   std::string name_;
@@ -52,12 +53,11 @@ private:
   Channel* channel_;
   Buffer* readBuf_;
   Buffer* writeBuf_;
-  Status  status_;
   INetAddress localAddr_;
   INetAddress peerAddr_;
   MessageCallback messageCallback_;
-  CloseCallback closeCallback_;
-  WriteCompleteCallback writeCompleteCallback_;
+  ConnectionCallback destroyCallback_;
+  ConnectionCallback writeCompleteCallback_;
   size_t highWaterMark_;
   HighWaterMarkCallback highWaterMarkCallback_;
 };

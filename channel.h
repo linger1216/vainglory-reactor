@@ -23,7 +23,7 @@ public:
 public:
   Channel(int fd, FDEvent events,
           EventCallback readCallback, EventCallback writeCallback,
-          EventCallback closeCallback,EventCallback errorCallback,
+          EventCallback destroyCallback,EventCallback errorCallback,
           void* arg);
   ~Channel();
 
@@ -64,7 +64,7 @@ private:
   // 所以定义相关的callback函数
   EventCallback readCallback_;
   EventCallback writeCallback_;
-  EventCallback closeCallback_;
+  EventCallback destroyCallback_;
   EventCallback errorCallback_;
 
   // 回调函数的参数

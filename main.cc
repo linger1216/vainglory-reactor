@@ -4,8 +4,17 @@
 #include "log.h"
 #include "buffer.h"
 
+
 void connectionCallback(const TcpConnection* conn){
-  Debug("messageCallback");
+  Debug("APP connectionCallback %p", conn);
+}
+
+void destroyCallback(const TcpConnection* conn){
+  Debug("APP destroyCallback %p", conn);
+}
+
+void writeCallback(const TcpConnection* conn){
+  Debug("APP writeCallback %p", conn);
 }
 
 void messageCallback(const TcpConnection* conn, Buffer* buffer, int n){
@@ -19,12 +28,12 @@ void messageCallback(const TcpConnection* conn, Buffer* buffer, int n){
   buffer->Append("hello");
 }
 
-void writeCallback(const TcpConnection* conn){
-  Debug("messageCallback xxx");
-}
-
 int main() {
-  TcpServer server(8888, 1, connectionCallback,messageCallback, writeCallback);
+  TcpServer server(8888, 1,
+                   connectionCallback,
+                   destroyCallback,
+                   messageCallback,
+                   writeCallback);
   server.Run();
   return 0;
 };

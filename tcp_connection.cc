@@ -17,64 +17,79 @@
 TcpConnection::TcpConnection(const char* name, int fd, EventLoop* eventLoop,
                              const INetAddress* localAddr,
                              const INetAddress* peerAddr,
-                             CloseCallback closeCallback,
+                             ConnectionCallback destroyCallback,
                              MessageCallback messageCallback,
-                             WriteCompleteCallback writeCompleteCallback)
+                             ConnectionCallback writeCompleteCallback)
     : name_(name),
       loop_(eventLoop),
-      status_(Status::Disconnected),
       localAddr_(*localAddr),
       peerAddr_(*peerAddr),
-      closeCallback_(std::move(closeCallback)),
+      destroyCallback_(std::move(destroyCallback)),
       messageCallback_(std::move(messageCallback)),
       writeCompleteCallback_(std::move(writeCompleteCallback)) {
 
   name_ = "TcpConnection-" + std::to_string(fd);
   Debug("创建TCP连接, connName: %s", name_.c_str());
-  readBuf_ = new Buffer(BUFFER_SIZE);
-  writeBuf_ = new Buffer(BUFFER_SIZE);
 
-  auto readHandler = std::bind(&TcpConnection::readHandler, this, std::placeholders::_1);
-  auto writeHandler = std::bind(&TcpConnection::writeHandler, this, std::placeholders::_1);
-  auto closeHandler = std::bind(&TcpConnection::closeHandler, this, std::placeholders::_1);
-  auto errorHandler = std::bind(&TcpConnection::errorHandler, this, std::placeholders::_1);
+  readBuf_ = new Buffer(BUFFER_SIZE);
+  Debug("【资源】新增对象 ReadBuffer = %p", readBuf_);
+
+  writeBuf_ = new Buffer(BUFFER_SIZE);
+  Debug("【资源】新增对象 WriteBuffer = %p", writeBuf_);
 
   // 设置 keep alive
   SocketHelper::SetKeepAlive(fd, true);
 
   channel_ = new Channel(fd, FDEvent::ReadEvent,
-                         readHandler, writeHandler,
-                         closeHandler, errorHandler,
+                         std::bind(&TcpConnection::handlerRead, this, std::placeholders::_1),
+                         std::bind(&TcpConnection::handlerWrite, this, std::placeholders::_1),
+                         std::bind(&TcpConnection::destroy, this),
+                         std::bind(&TcpConnection::handlerError, this, std::placeholders::_1),
                          this);
+  Debug("【资源】新增对象 Channel fd=%d = %p", fd, channel_);
+
   loop_->AddChannelEventInLoop(channel_);
 }
 
 TcpConnection::~TcpConnection() {
-  loop_->DestroyChannel(channel_);
+
+  auto fd = channel_->Fd();
+  // 删除对底层的监听
+  Debug("删除对底层的监听 from %d", fd);
+  loop_->DeleteChannelEventInLoop(channel_);
+
+  // 清理loop中关于这个channel的资源
+  Debug("【释放】EventLoop fd2ChannelMap_ 删除了 %d -> %p", fd, channel_);
+  loop_->EraseChannelInMap(channel_);
+
+  Debug("【释放】删除对象 Channel fd=%d = %p", fd, channel_);
   delete channel_;
+  Debug("【释放】删除对象 ReadBuffer = %p", readBuf_);
   delete readBuf_;
+  Debug("【释放】删除对象 WriteBuffer = %p", writeBuf_);
   delete writeBuf_;
   Debug("%s 释放读写缓冲区,channel内存", name_.c_str());
+
+  Debug("【释放】关闭文件描述符 %d", fd);
+  ::close(fd);
 }
 
-int TcpConnection::readHandler(void* arg) {
-  auto conn = static_cast<TcpConnection*>(arg);
+int TcpConnection::handlerRead(void* arg) {
   int errNo = 0;
-  int count = conn->readBuf_->ReadSocket(conn->channel_->Fd(), &errNo);
+  int count = readBuf_->ReadSocket(channel_->Fd(), &errNo);
   if (count > 0) {
-    messageCallback_(conn, conn->readBuf_, count);
+    messageCallback_(this, readBuf_, count);
   } else if (count == 0) {
     // 没有读到数据，关闭连接
-    Debug("client down, so we close connection");
-    //    conn->loop_->AddTask(conn->channel_, EventLoopOperator::Delete);
-    conn->loop_->DeleteChannelEventInLoop(conn->channel_);
+    Debug("TcpConnection::handlerRead read 0 byte, so we close connection %s ", tid());
+    destroy();
   } else {
-    Error("read error, error code: %d\n", SocketHelper::GetSocketError(conn->channel_->Fd()));
+    Error("read error, error code: %d\n", SocketHelper::GetSocketError(channel_->Fd()));
   }
   return 0;
 }
 
-int TcpConnection::writeHandler(void* arg) {
+int TcpConnection::handlerWrite(void* arg) {
   assert(loop_->IsInLoopThread());
   auto conn = static_cast<TcpConnection*>(arg);
   // 判断是否有写事件
@@ -104,26 +119,30 @@ int TcpConnection::writeHandler(void* arg) {
   return 0;
 }
 
-int TcpConnection::errorHandler(void* arg) {
+int TcpConnection::handlerError(void* arg) {
   auto conn = static_cast<TcpConnection*>(arg);
   int err = SocketHelper::GetSocketError(conn->channel_->Fd());
-  Warn("errorHandler, error code: %d\n", err);
+  Warn("handlerError, error code: %d\n", err);
   return 0;
 }
 
-int TcpConnection::closeHandler(void* arg) {
-  assert(loop_->IsInLoopThread());
-//  auto conn = static_cast<TcpConnection*>(arg);
-  Debug("fd=%d state = %s", channel_->Fd(), stateToString());
-  assert(status_ == Status::Connected || status_ == Status::Disconnecting);
-  status_ = Status::Disconnected;
+int TcpConnection::handlerDestroy(void* arg) {
+  Debug("TcpConnection::handlerDestroy %s ", tid());
 
-  // 去除channel的底层事件监听
+
+  // 这里应该是来自io线程判断出来读事件为0, 然后调用channel的destroy callback
+  // 继而调用的是connection 的handler destroy
+  loop_->AssertInLoop();
+
+  // 禁用channel的底层事件监听
   channel_->DisableAll();
   loop_->UpdateChannelEventInLoop(channel_);
+  Debug("禁用%d的一切事件", channel_->Fd());
 
-  Debug("closeHandler arg:%p, 准备删除此连接", arg);
-//  delete conn;
+  // 调用close Callback
+  if (destroyCallback_) {
+    destroyCallback_(this);
+  }
   return 0;
 }
 
@@ -147,11 +166,6 @@ void TcpConnection::Send(const char* data, size_t len) {
   ssize_t wroteSize = 0;
   size_t remaining = len;
   bool faultError = false;
-
-  if (status_ == Status::Disconnected) {
-    Error("disconnected, give up writing");
-    return;
-  }
 
   // 之前没有设置过写操作,第一次开始写数据
   // 写缓冲区没有可读的数据, 也就是说 写缓冲区没有待发送数据
@@ -240,28 +254,11 @@ EventLoop* TcpConnection::Loop() {
   return loop_;
 }
 
-int TcpConnection::Close() {
-//  loop_->AssertInLoop();
-//  if (status_ == Status::Connected) {
-//    channel_->DisableAll();
-//    if (connectionCallback_) {
-//      connectionCallback_(this);
-//    }
-//    status_ = Status::Disconnected;
-//  }
+// 这里是很有必要的, 包装一个functor, 让其进入队列唤醒执行.
+// 不能在io线程的空间执行函数
+int TcpConnection::destroy() {
+  Debug("TcpConnection::destroy create:%s invoke:%s", tid(loop_->GetThreadId()), tid());
+  auto fn = std::bind(&TcpConnection::handlerDestroy, this, this);
+  loop_->RunInLoop(fn);
   return 0;
-}
-const char* TcpConnection::stateToString() const {
-  switch (status_) {
-    case Status::Disconnected:
-      return "Disconnected";
-    case Status::Connected:
-      return "Connected";
-    case Status::Connecting:
-      return "Connecting";
-    case Status::Disconnecting:
-      return "Disconnecting";
-    default:
-      return "unknown state";
-  }
 }

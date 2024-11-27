@@ -144,12 +144,11 @@ void EventLoop::processTask() {
 //}
 
 // 释放channel资源
-int EventLoop::DestroyChannel(Channel* channel) {
+int EventLoop::EraseChannelInMap(Channel* channel) {
   auto it = fd2ChannelMap_.find(channel->Fd());
   if (it != fd2ChannelMap_.end()) {
     fd2ChannelMap_.erase(it);
-    close(channel->Fd());
-    Debug("%s 删除fd2ChannelMap_中的channel映射, 关闭fd描述符", threadName_.c_str());
+    Debug("%s 删除fd2ChannelMap_中的channel映射", threadName_.c_str());
   }
   return 0;
 }
@@ -190,6 +189,7 @@ int EventLoop::DeleteChannelEventInLoop(Channel* channel) {
 
 int EventLoop::addChannelEvent(Channel* channel) {
   fd2ChannelMap_.insert(std::make_pair(channel->Fd(), channel));
+  Debug("【资源】EventLoop fd2ChannelMap_ 添加了 %d -> %p", channel->Fd(), channel);
   return dispatcher_->Add(channel);
 }
 int EventLoop::updateChannelEvent(Channel* channel) {

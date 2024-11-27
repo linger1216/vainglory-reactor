@@ -19,18 +19,15 @@ class TcpServer : public NoCopyable{
 public:
   ~TcpServer();
   explicit TcpServer(unsigned short port, int threadNum,
-                     ConnectionCallback connectionCallback,
+                     ConnectionCallback newConnectionCallback,
+                     ConnectionCallback destroyCallback,
                      MessageCallback messageCallback,
-                     WriteCompleteCallback writeCompleteCallback);
+                     ConnectionCallback writeCompleteCallback);
 public:
   int Run();
 private:
-  void listen();
-  int acceptConnection();
   void newConnectionCallback(int clientFd, const INetAddress* peerAddr);
-  void removeConnection(const TcpConnection* conn);
-  void defaultConnectionCallback(const TcpConnection* conn);
-  void defaultMessageCallback(const TcpConnection* conn, Buffer*, int n);
+  void destroyConnection(const TcpConnection* conn);
 private:
   int fd_;
   INetAddress* netAddress_;
@@ -38,8 +35,9 @@ private:
   ThreadPool* threadPool_;
   Acceptor* acceptor_;
   ConnectionCallback connectionCallback_;
+  ConnectionCallback destroyCallback_;
   MessageCallback messageCallback_;
-  WriteCompleteCallback writeCompleteCallback_;
+  ConnectionCallback writeCompleteCallback_;
   std::map<std::string, TcpConnection*> connections_;
 };
 
