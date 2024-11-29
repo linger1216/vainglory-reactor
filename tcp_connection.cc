@@ -100,7 +100,21 @@ int TcpConnection::handlerRead(void* arg) {
     Debug("TcpConnection::handlerRead read 0 byte, so we close connection %p ", std::this_thread::get_id());
     handlerDestroy(this);
   } else {
-    Error("read error, error code: %d\n", SocketHelper::GetSocketError(channel_->Fd()));
+
+    // 判断errno, 如果符合关闭连接的错误码，则关闭连接
+    if (errno == ECONNRESET ||    // 连接被对端重置
+        errno == ENOTCONN ||      // 套接字未连接
+        errno == EPIPE ||         // 写入已关闭的连接
+        errno == ETIMEDOUT ||     // 连接超时
+        errno == ECONNREFUSED ||   // 连接被拒绝
+        errno == ENETUNREACH ||    // 网络不可达
+        errno == EHOSTUNREACH ||   // 主机不可达
+        errno == EACCES ||         // 权限被拒绝
+        errno == EBADF)           // 无效的文件描述符
+    {
+      // 关闭连接
+      handlerDestroy(this);
+    }
   }
   return 0;
 }

@@ -3,13 +3,14 @@
 //
 
 #include "buffer.h"
+#include "log.h"
 #include <bits/types/struct_iovec.h>
+#include <cerrno>
 #include <csignal>
 #include <cstdlib>
 #include <cstring>
 #include <sys/socket.h>
 #include <sys/uio.h>
-#include <cerrno>
 Buffer::~Buffer() {
   delete [] data_;
 }
@@ -87,7 +88,7 @@ int Buffer::ReadSocket(int fd, int* reason) {
   int n = static_cast<int>(readv(fd, iov, 2));
   if (n < 0) {
     *reason = errno;
-    return -1;
+    return n;
   } else if (n <= writeable) {
     writeOffset_ += n;
   } else {
