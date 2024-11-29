@@ -28,7 +28,7 @@ public:
 private:
   void newConnectionCallback(int clientFd, const INetAddress* peerAddr);
   void destroyConnection(const TcpConnection* conn);
-  void destroyWrapLoop(const TcpConnection* conn);
+  void destroyByCallback(const TcpConnection* conn);
 private:
   int fd_;
   INetAddress* netAddress_;

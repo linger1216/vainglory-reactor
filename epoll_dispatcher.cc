@@ -34,12 +34,9 @@ int EpollDispatcher::Delete(Channel* channel) {
   int ret = epollControl(channel, EPOLL_CTL_DEL);
   if (ret == -1) {
     Warn("epoll_ctl del error, fd=%d, channel=%p", channel->Fd(), channel);
+    int savedErrno = errno;
+    Error("Delete error: %s", strerror(savedErrno));
   }
-
-  // TODO
-  // 需要把当前channel的fd资源删除
-  // 本意要执行destroy的回调。但tm需要仔细思考思考
-  Debug("底层不在监听channel %d的监听事件[%p]", channel->Fd());
   channel->ExecCallback(channel->Arg(), FDEvent::CloseEvent);
   return 0;
 }
@@ -94,6 +91,8 @@ int EpollDispatcher::epollControl(Channel* channel, int op) const {
   memset(&ev, 0, sizeof(ev));
   ev.data.fd = channel->Fd();
   ev.events = events;
+
+  // events = 0 其实就等于删除操作.
   return epoll_ctl(epollfd_, op, channel->Fd(), &ev);
 }
 

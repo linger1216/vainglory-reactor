@@ -21,6 +21,7 @@ TcpConnection::TcpConnection(const char* name, int fd, EventLoop* eventLoop,
                              MessageCallback messageCallback,
                              ConnectionCallback writeCompleteCallback)
     : name_(name),
+      status_(Status::Disconnected),
       loop_(eventLoop),
       localAddr_(*localAddr),
       peerAddr_(*peerAddr),
@@ -47,11 +48,23 @@ TcpConnection::TcpConnection(const char* name, int fd, EventLoop* eventLoop,
                          std::bind(&TcpConnection::handlerError, this, std::placeholders::_1),
                          this);
   Debug("【资源】新增对象 Channel fd=%d = %p", fd, channel_);
-
+  // TODO 状态要不要给个cb来回调
+  status_ = Status::Connecting;
   loop_->AddChannelEventInLoop(channel_);
+  status_ = Status::Connected;
 }
 
 TcpConnection::~TcpConnection() {
+  // delete conn前一定要调用destroy函数
+  // 因为conn是在mainloop中创建的, 按照谁申请谁释放的原则, 应该是mainloop去delete conn;
+  // 但mainloop是在主线程内构造, 所以在mainloop中delete conn不安全, 要在io中去操作
+  // 所以在main中要调用ioloop->Destroy. 然后在手动执行delete.
+  // 所以这里的析构函数为空.
+  // 一定要注意 ⚠!!!
+}
+
+int TcpConnection::Destroy() {
+  loop_->AssertInLoop();
 
   auto fd = channel_->Fd();
   // 删除对底层的监听
@@ -60,6 +73,7 @@ TcpConnection::~TcpConnection() {
 
   // 清理loop中关于这个channel的资源
   Debug("【释放】EventLoop fd2ChannelMap_ 删除了 %d -> %p", fd, channel_);
+
   loop_->EraseChannelInMap(channel_);
 
   Debug("【释放】删除对象 Channel fd=%d = %p", fd, channel_);
@@ -72,7 +86,9 @@ TcpConnection::~TcpConnection() {
 
   Debug("【释放】关闭文件描述符 %d", fd);
   ::close(fd);
+  return 0;
 }
+
 
 int TcpConnection::handlerRead(void* arg) {
   int errNo = 0;
@@ -133,17 +149,25 @@ int TcpConnection::handlerDestroy(void* arg) {
   // 2. epoll在read事件中发现读到的长度为0
   // 但不管怎么样, 这些都是io线程, io线程处理io线程的资源
   // io调用上层也就是server的callback, 属于跨线程, 需要wake up and loop
-  Debug("TcpConnection::handlerDestroy");
-
   // 这里应该是来自io线程判断出来读事件为0, 然后调用channel的destroy callback
-  // 继而调用的是connection 的handler destroy
+  // 继而调用的是connection 的handler Destroy
   loop_->AssertInLoop();
+  if (status_ == Status::Disconnecting || status_ == Status::Disconnected) {
+    Debug("TcpConnection::handlerDestroy return %s", statusToString(status_));
+    return 0;
+  }
+
+  Debug("TcpConnection::handlerDestroy %s", statusToString(status_));
+
+  status_ = Status::Disconnecting;
 
   // 禁用channel的底层事件监听
-  channel_->DisableAll();
-  loop_->UpdateChannelEventInLoop(channel_);
-  Debug("禁用%d的一切事件", channel_->Fd());
+//  loop_->DeleteChannelEventInLoop(channel_);
+//  Debug("禁用%d的一切事件", channel_->Fd());
 
+  Destroy();
+
+  status_ = Status::Disconnected;
 
   // TODO 有问题, 这里的loop是io, 怎么调用到server里面的callback, 跨线程通知.
   // 调用close Callback
@@ -260,15 +284,16 @@ const char* TcpConnection::PeerIpPort() {
 EventLoop* TcpConnection::Loop() {
   return loop_;
 }
+const char* TcpConnection::statusToString(Status status) const {
 
-// 这里是很有必要的, 包装一个functor, 让其进入队列唤醒执行.
-// 不能在io线程的空间执行函数
-//int TcpConnection::destroy() {
-//
-//  loop_->AssertInLoop();
-//
-//  Debug("TcpConnection::destroy create:%p invoke:%p", loop_->GetThreadId(), std::this_thread::get_id());
-//  auto fn = std::bind(&TcpConnection::handlerDestroy, this, this);
-//  loop_->RunInLoop(fn);
-//  return 0;
-//}
+  if (status == Status::Disconnecting) {
+    return "Disconnecting";
+  } else if (status == Status::Connected) {
+    return "Connected";
+  } else if (status == Status::Disconnected) {
+    return "Disconnected";
+  } else if (status == Status::Connecting) {
+    return "Connecting";
+  }
+  return "Unknown Status";
+}

@@ -38,16 +38,16 @@ public:
   EventLoop* Loop();
   const char* Name();
   const char* PeerIpPort();
-
+  int Destroy();
 private:
-//  int destroy();
-  const char* stateToString() const;
+  const char* statusToString(Status status) const;
   int handlerRead(void* arg);
   int handlerWrite(void* arg);
   int handlerDestroy(void* arg);
   int handlerError(void* arg);
 private:
   const int BUFFER_SIZE = 10240;
+  std::atomic<Status> status_;
   std::string name_;
   EventLoop* loop_;
   Channel* channel_;

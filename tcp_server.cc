@@ -77,14 +77,16 @@ void TcpServer::destroyConnection(const TcpConnection* conn) {
   assert(n == 1);
   Debug("【释放】TcpServer connections 删除了 TcpConnection[%s] = %p", c->Name(), c);
 
-  // 2. 删除资源
-  // 关闭资源在io线程中做, 因为这个连接的资源是io线程拥有的
-  //  auto ioLoop = c->Loop();
-  //  ioLoop->RunInLoop(std::bind(&TcpConnection::Destroy, c));
+  // 手动删除tcp conn的资源
+  // 想依靠delete来触发tcp conn的析构操作, 可以但不安全
+  // 因为tcp server是mainloop, tcp conn是io loop
+//  auto ioLoop = c->Loop();
+//  ioLoop->RunInLoop(std::bind(&TcpConnection::Destroy, c));
 
   Debug("【释放】删除对象 TcpConnection[%s] = %p", c->Name(), conn);
   delete conn;
 
+  // 回调应用层的函数
   if (destroyCallback_) {
     destroyCallback_(conn);
   }
@@ -101,7 +103,7 @@ void TcpServer::newConnectionCallback(int clientFd, const INetAddress* peerAddr)
   auto name = "TcpConnection-" + std::to_string(clientFd);
 
   auto conn = new TcpConnection(name.c_str(), clientFd, ioLoop, &localAddr, peerAddr,
-                                std::bind(&TcpServer::destroyWrapLoop, this, std::placeholders::_1),
+                                std::bind(&TcpServer::destroyByCallback, this, std::placeholders::_1),
                                 messageCallback_,
                                 writeCompleteCallback_);
   Debug("【资源】新增对象 TcpConnection[%s] = %p", name.c_str(), conn);
@@ -116,8 +118,10 @@ void TcpServer::newConnectionCallback(int clientFd, const INetAddress* peerAddr)
 }
 
 // 被直接回调, 来自io线程所以要转换成本地运行.
-void TcpServer::destroyWrapLoop(const TcpConnection* conn) {
-  Debug("TcpServer destroyWrapLoop");
+// 这里是很有必要的, 包装一个functor, 让其进入队列唤醒执行.
+// 不能在io线程的空间执行函数
+void TcpServer::destroyByCallback(const TcpConnection* conn) {
+  Debug("TcpServer destroyByCallback");
   auto fn = [this, conn](){
     this->destroyConnection(conn);
     return 0; // 返回0，因为EventLoop::Functor期望返回int
