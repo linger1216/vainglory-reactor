@@ -212,9 +212,13 @@ void TcpConnection::Send(const char* data, size_t len) {
   size_t remaining = len;
   bool faultError = false;
 
-  // 之前没有设置过写操作,第一次开始写数据
-  // 写缓冲区没有可读的数据, 也就是说 写缓冲区没有待发送数据
+  Debug("准备开始写数据");
+
+  // 之前没有设置过写操作 & 写缓冲区没有可读的数据
+  // 好像有点明白是为啥了， 写缓冲区没有设置， 且也没有数据， 那么就直接发送，不走缓冲区了
   if (!channel_->IsWriting() && writeBuf_->GetReadableSize() == 0) {
+    Debug("缓冲区没有数据，准备使用原生的方式发送");
+
     wroteSize = ::write(channel_->Fd(), data, len);
     /*
      * wroteSize == 0 的场景
@@ -231,63 +235,74 @@ void TcpConnection::Send(const char* data, size_t len) {
       当它满了之后，新的写入操作将无法进行，直到缓冲区中的空间被释放
      */
     if (wroteSize >= 0) {
+      Debug("成功写入了数据 长度为:%d", wroteSize);
       remaining = len - wroteSize;
       // 写完了data[len]到到内核缓冲区, 就回调writeCompleteCallback_
       if (remaining == 0 && writeCompleteCallback_ != nullptr) {
-        // 这里要改造loop的task啊....
-        // 不仅仅是只有channel的东西, 还有一些业务逻辑
-        // 为啥要调用就回调writeCompleteCallback_
-        // TODO:
+        // 因为send是用户主线程操作，不能直接调用writeCompleteCallback_
+        // 要找到所在的loop，去执行
+        auto fn = [this](){
+          this->writeCompleteCallback_(this);
+          return 0; // 返回0，因为EventLoop::Functor期望返回int
+        };
+        loop_->QueueInLoop(fn);
+        Debug("全部数据都写完了");
       }
     } else {
+      Debug("数据写入的时候发生了错误,返回为:%d", wroteSize);
       wroteSize = 0;
       // EWOULDBLOCK: 发送缓冲区已满
       // 用来检查在非阻塞模式下进行写操作时，
       // 是否因为内核缓冲区暂时没有空间而无法立即完成写入
       // 等同于EAGAIN
       if (errno == EWOULDBLOCK) {
-        Warn("TcpConnection::send");
+        Debug("内核错误:EWOULDBLOCK");
         // EPIPE 表示尝试向已经关闭的管道写入数据，即“Broken pipe”
         // 而 ECONNRESET 表示连接被对方重置
         // 这两种情况都表明连接已经出现问题，无法继续进行正常的数据传输，
         // 因此设置 faultError 为 true 来标记这个错误状态。
         // 在实际应用中，这可能意味着需要关闭连接并进行相应的错误处理。
         if (errno == EPIPE || errno == ECONNRESET) {
+          Debug("内核错误: %d", errno);
           faultError = true;
         }
       }
     }
   }
 
-  /**
-     * 说明当前这一次write并没有把数据全部发送出去 剩余的数据需要保存到缓冲区当中
-     * 然后给channel注册EPOLLOUT事件，Poller发现tcp的发送缓冲区有空间后会通知
-     * 相应的sock->channel，调用channel对应注册的writeCallback_回调方法，
-     * channel的writeCallback_实际上就是TcpConnection设置的handleWrite回调，
-     * 把发送缓冲区outputBuffer_的内容全部发送完成
-     **/
-
-  // 处理剩余待发送数据
-  // 可能就是数据没写完
-  // 举例:
-  // len = 1000
-  // wroteSize = 600
+  // 如果发生了错误, 尝试写入到缓冲区.
+  // 说明当前这一次write并没有把数据全部发送出去 剩余的数据需要保存到缓冲区当中
+  // 然后给channel注册EPOLLOUT事件，Poller发现tcp的发送缓冲区有空间后会通知
+  // 相应的sock->channel，调用channel对应注册的writeCallback_回调方法，
+  // channel的writeCallback_实际上就是TcpConnection设置的handleWrite回调，
+  // 把发送缓冲区outputBuffer_的内容全部发送完成
   if (!faultError && remaining > 0) {
+    Debug("确认内核写缓冲区发生了错误");
     size_t oldLen = writeBuf_->GetReadableSize();
     if (oldLen + remaining >= highWaterMark_ &&
-        oldLen < highWaterMark_ &&
-        highWaterMarkCallback_) {
+        oldLen < highWaterMark_ && highWaterMarkCallback_) {
       // TODO
-    }
+      Debug("当前的缓冲区已经超过了高水位");
 
-    // 如果当前发送缓冲区的数据量已经超过了高水位线，
-    // 则执行高水位回调highWaterMarkCallback_
+      // 如果当前发送缓冲区的数据量已经超过了高水位线，
+      // 则执行高水位回调highWaterMarkCallback_
+      size_t size = oldLen + remaining;
+      auto fn = [this, size](){
+        this->highWaterMarkCallback_(this, size);
+        return 0; // 返回0，因为EventLoop::Functor期望返回int
+      };
+      loop_->QueueInLoop(fn);
+    }
+    Debug("准备写到缓冲区 写长度为:%d", remaining);
     // 这里一定要注册channel的写事件 否则poller不会给channel通知epollout
-    writeBuf_->Append(data + wroteSize, remaining);
+    writeBuf_->Append(data + wroteSize, static_cast<int>(remaining));
     if (!channel_->IsWriting()) {
+      Debug("监测到没有注册写事件, 那么注册写事件");
       channel_->EnableWriting();
+      loop_->AddChannelEventInLoop(channel_);
     }
   }
+  Debug("写入流程结束");
 }
 const char* TcpConnection::Name() {
   return name_.c_str();

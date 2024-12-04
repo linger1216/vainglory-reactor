@@ -23,10 +23,15 @@ void messageCallback(const TcpConnection* conn, Buffer* buffer, int n){
   msg[n] = '\0';
   Debug("recv msg:%s", msg);
   delete []msg;
-
   auto c = const_cast<TcpConnection*>(conn);
-  auto str = "hello world";
-  c->Send(str, strlen(str));
+
+  auto size = 10 * 1024 * 1024;
+  char content[size];
+  std::memset(content, 'A', sizeof(content));
+  content[size - 1] = '\0';
+  c->Send(content, size);
+
+//  c->Send("hello", 5);
 }
 
 int main() {
